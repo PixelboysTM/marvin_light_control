@@ -1,0 +1,24 @@
+[package]
+name = "mlc_interface"
+version = "0.1.0"
+authors = ["Tim Fritzen <fritzentim10@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# remoc = { workspace = true, features = ["js"] }
+mlc_communication = { path = "../mlc_communication" }
+mlc_data = { path = "../mlc_data" }
+dioxus = { version = "0.6.0", features = ["router"] }
+dioxus-free-icons = { version = "0.9.0", features = ["lucide"] }
+serde.workspace = true
+futures.workspace = true
+serde_json = "1.0.139"
+tokio.workspace = true
+
+[features]
+default = ["desktop"]
+web = ["dioxus/web"]
+desktop = ["dioxus/desktop"]
+mobile = ["dioxus/mobile"]

@@ -1,0 +1,11 @@
+[package]
+name = "mlc_data"
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+edition.workspace = true
+
+[dependencies]
+macro_rules_attribute.workspace = true
+serde.workspace = true
+chrono = { version = "0.4.40", features = ["serde"] }

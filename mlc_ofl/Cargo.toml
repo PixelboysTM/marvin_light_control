@@ -1,0 +1,8 @@
+[package]
+name = "mlc_ofl"
+version.workspace = true
+authors.workspace = true
+homepage.workspace = true
+edition.workspace = true
+
+[dependencies]

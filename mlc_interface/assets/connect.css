@@ -1,0 +1,39 @@
+.connect {
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid var(--c-p);
+    border-radius: var(--br);
+    background-color: var(--c-pnl);
+    animation: colors 5s linear 0s infinite;
+
+    .addr {
+        width: 8rem;
+    }
+
+    .port {
+        width: 4rem;
+    }
+}
+
+#main {
+    align-content: center;
+}
+
+@keyframes colors {
+    0% {
+        border: 1px solid var(--c-p);
+    }
+
+    33% {
+        border: 1px solid var(--c-s);
+    }
+
+    66% {
+        border: 1px solid var(--c-t);
+    }
+
+    100% {
+        border: 1px solid var(--c-p);
+    }
+}

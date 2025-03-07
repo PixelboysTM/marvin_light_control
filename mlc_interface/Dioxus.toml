@@ -1,0 +1,27 @@
+[application]
+
+# App (Project) Name
+name = "mlc_interface"
+
+[web.app]
+
+# HTML title tag content
+title = "Marvin Light Control"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []
+
+[bundle]
+icon = ["assets/icon.png", "assets/icon.ico"]

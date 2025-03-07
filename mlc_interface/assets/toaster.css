@@ -1,0 +1,71 @@
+.toasterProvider {
+    width: 20rem;
+    min-height: 1rem;
+
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+
+    .toast {
+        --level-c: white;
+
+        width: 100%;
+        height: 5rem;
+        display: block;
+        padding: 0.25rem;
+        border: 1px solid var(--level-c);
+        border-radius: var(--br);
+        margin-top: var(--space);
+        background-color: var(--c-pnl);
+        opacity: 1;
+        overflow: hidden;
+
+        transition: all 250ms;
+
+        @starting-style {
+            transform: translateX(120%);
+            opacity: 0;
+        }
+
+        &.info {
+            --level-c: var(--c-info);
+        }
+
+        &.warn {
+            --level-c: var(--c-warn);
+        }
+
+        &.error {
+            --level-c: var(--c-err);
+        }
+
+        &.debug {
+            --level-c: var(--c-t);
+        }
+
+        &.trace {
+            --level-c: var(--c-disabled);
+        }
+
+        .title {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: var(--space);
+
+            .dot {
+                width: 0.8em;
+                height: 0.8em;
+                background-color: var(--level-c);
+                border-radius: 0.5em;
+            }
+
+            border-bottom: 1px solid var(--c-disabled);
+        }
+
+        .msg {
+            font-size: 0.8em;
+        }
+    }
+}
