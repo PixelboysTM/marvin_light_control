@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use bounded::{
     BoundedValue,
     bounds::{DynamicU8, DynamicU16, DynamicU32, One, Zero},
@@ -65,30 +67,42 @@ impl PercentageDmxExt for Percentage {
     }
 
     fn from_single_dmx(dmx: SingleDMXValue) -> Self {
-        let val = dmx.take() as f32 / SingleDMXValue::
+        let val = dmx.take() as f32 / SingleDMXValue::max() as f32;
+        Self::create(val)
     }
 
     fn from_double_dmx(dmx: DoubleDMXValue) -> Self {
-        todo!()
+        let val = dmx.take() as f32 / DoubleDMXValue::max() as f32;
+        Self::create(val)
     }
 
     fn from_tripple_dmx(dmx: TrippleDMXValue) -> Self {
-        todo!()
+        let val = dmx.take() as f32 / TrippleDMXValue::max() as f32;
+        Self::create(val)
     }
 
     fn to_gen_dmx(&self, granularity: DmxGranularity) -> GenericDMXValue {
-        todo!()
+        GenericDMXValue::create((self.take() * granularity.max() as f32) as u32)
     }
 
     fn to_single_dmx(&self) -> SingleDMXValue {
-        todo!()
+        SingleDMXValue::create((self.take() * SingleDMXValue::max() as f32) as u8)
     }
 
     fn to_double_dmx(&self) -> DoubleDMXValue {
-        todo!()
+        DoubleDMXValue::create((self.take() * DoubleDMXValue::max() as f32) as u16)
     }
 
     fn to_tripple_dmx(&self) -> TrippleDMXValue {
-        todo!()
+        TrippleDMXValue::create((self.take() * TrippleDMXValue::max() as f32) as u32)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MaybeLinear<T> where T: Debug + Clone {
+    Constant(T),
+    Linear{
+        start: T,
+        end: T,
     }
 }

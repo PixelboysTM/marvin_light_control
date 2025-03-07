@@ -94,6 +94,13 @@ impl<T: PartialOrd + Debug, MIN: Bounds<T>, MAX: Bounds<T>, H: OutOfBoundsHandle
     pub fn once(val: T) -> T {
         Self::create(val).take()
     }
+
+    pub const fn min() -> T {
+        MIN::VALUE
+    }
+    pub const fn max() -> T {
+        MAX::VALUE
+    }
 }
 
 impl<T, MIN: Bounds<T>, MAX: Bounds<T>, H> Deref for BoundedValue<T, MIN, MAX, H> {

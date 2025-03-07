@@ -21,6 +21,13 @@ pub trait ToFileName {
     fn to_project_file_name(&self) -> Self::Out;
 }
 
+impl ToFileName for &str {
+    type Out = String;
+    fn to_project_file_name(&self) -> Self::Out {
+        self.to_string().to_project_file_name()
+    }
+}
+
 impl ToFileName for String {
     type Out = String;
 
