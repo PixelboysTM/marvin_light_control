@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use serde_json::Value;
-use mlc_data::fixture::blueprint::{FixtureBlueprint, Metadata, Physical, PixelGroupIdentifier, PixelMatrix};
+use mlc_data::fixture::blueprint::{ChannelIdentifier, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelMatrix};
 use mlc_data::project::ToFileName;
 
 pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBlueprint, Box<dyn std::error::Error>> {
@@ -9,10 +9,7 @@ pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBluepr
     let matrix = parse_matrix(&ofl_source["matrix"])?;
 
 
-    let modes = {
-        log::warn!("Mode parsing not yet implemented");
-        vec![]
-    };
+    let modes = parse_modes(matrix.as_ref(), &ofl_source["modes"])?;
 
 
     let wheels = {
@@ -32,6 +29,145 @@ pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBluepr
         modes,
         wheels,
         channels
+    })
+}
+
+fn parse_modes(m: Option<&PixelMatrix>,src: &Value) -> Result<Vec<Mode>, Box<dyn std::error::Error>> {
+    if src.is_null() { return Ok(Vec::new()); }
+
+    let modes = src.as_array().ok_or("modes is not an array")?;
+
+    modes.iter().map(|v| parse_mode(m, v) ).collect::<Result<Vec<_>, _>>()
+}
+
+fn gen_each_pixel(f: usize, s: usize, t: usize) -> Vec<String> {
+    let mut v = Vec::new();
+    for fi in 1..=f {
+        for si in 1..=s {
+            for ti in 1..=t {
+                v.push(format!("({}, {}, {})", ti, si, fi));
+            }
+        }
+    }
+    v
+}
+
+
+
+fn parse_mode(m: Option<&PixelMatrix>,src: &Value) -> Result<Mode, Box<dyn std::error::Error>> {
+    let obj = src.as_object().ok_or("mode is not an object")?;
+
+    fn parse_channel(m: Option<&PixelMatrix>,src: &Value) -> Result<Vec<ChannelIdentifier>, Box<dyn std::error::Error>> {
+        if src.is_null() { return Ok(vec![ChannelIdentifier::default()]) }
+        if let Some(str) = src.as_str() {return Ok(vec![str.to_string()]) }
+
+        let obj = src.as_object().ok_or("mode must be one of null, string or object")?;
+        obj.get("insert").and_then(|s| s.as_str()).and_then(|s| if s == "matrixChannels" {Some(())} else {None}).ok_or("object mode must contain 'insert: matrixChannels'")?;
+
+        let m = m.ok_or("template channels require a matrix")?;
+
+        enum ChannelOrder {
+            PerPixel,
+            PerChannel
+        }
+
+        let channel_order = obj.get("channelOrder").and_then(|s| s.as_str()).and_then(|s| match s {
+            "perPixel" => Some(ChannelOrder::PerPixel),
+            "perChannel" => Some(ChannelOrder::PerChannel),
+            _ => None
+        }).ok_or("channelOrder must be one of perPixel, perChannel")?;
+
+        let template_channels = obj.get("templateChannels").and_then(|s| s.as_array()).ok_or("templateChannels must be array")?.iter().map(|v| {
+            match v {
+                Value::Null => Ok(None),
+                Value::String(str) => Ok(Some(str.clone())),
+                _ =>  Err("templateChannels must be string")
+            }
+        }).collect::<Result<Vec<_>, _>>()?;
+
+        enum RepeatFor {
+            Keys(Vec<String>),
+            EachPixelABC,
+            EachPixelXYZ,
+        	EachPixelXZY,
+        	EachPixelYXZ,
+        	EachPixelYZX,
+        	EachPixelZXY,
+        	EachPixelZYX,
+            EachPixelGroup,
+        }
+
+        let repeat_for = obj.get("repeatFor").and_then(|v| {
+            match v {
+                Value::String(s) if s == "eachPixelABC" => Some(RepeatFor::EachPixelABC),
+                Value::String(s) if s == "eachPixelXYZ" => Some(RepeatFor::EachPixelXYZ),
+                Value::String(s) if s == "eachPixelXZY" => Some(RepeatFor::EachPixelXZY),
+                Value::String(s) if s == "eachPixelYXZ" => Some(RepeatFor::EachPixelYXZ),
+                Value::String(s) if s == "eachPixelYZX" => Some(RepeatFor::EachPixelYZX),
+                Value::String(s) if s == "eachPixelZXY" => Some(RepeatFor::EachPixelZXY),
+                Value::String(s) if s == "eachPixelZYX" => Some(RepeatFor::EachPixelZYX),
+                Value::String(s) if s == "eachPixelGroup" => Some(RepeatFor::EachPixelGroup),
+                Value::Array(arr ) => arr.iter().map(|v| v.as_str().map(|s| s.to_string())).collect::<Option<Vec<_>>>().map(|v| RepeatFor::Keys(v)),
+                _ => None
+            }
+        }).ok_or("repeatFor is invalid")?;
+
+
+
+        let dims = m.dimensions();
+        let pixel_keys = match repeat_for {
+            RepeatFor::EachPixelABC => {
+                let mut ps = m.pixels.iter().flatten().flatten().flatten().map(|p| p.key.clone()).collect::<Vec<_>>();
+                ps.sort();
+                ps
+            }
+            RepeatFor::EachPixelGroup => m.groups.clone(),
+            RepeatFor::EachPixelXYZ => gen_each_pixel(dims[0], dims[1], dims[2]),
+            RepeatFor::EachPixelXZY => gen_each_pixel(dims[0], dims[2], dims[1]),
+            RepeatFor::EachPixelYXZ => gen_each_pixel(dims[1], dims[0], dims[2]),
+            RepeatFor::EachPixelYZX => gen_each_pixel(dims[1], dims[2], dims[0]),
+            RepeatFor::EachPixelZXY => gen_each_pixel(dims[2], dims[0], dims[1]),
+            RepeatFor::EachPixelZYX => gen_each_pixel(dims[2], dims[1], dims[0]),
+            RepeatFor::Keys(keys) => keys
+        };
+
+        //TODO: Gen channels
+
+        let channels = match channel_order {
+            ChannelOrder::PerPixel => {
+                pixel_keys.iter().flat_map(|pixel| {
+                    template_channels.iter().map(|template| {
+                        match template {
+                            Some(t ) => t.replace("$pixelKey",  pixel),
+                            None => String::new()
+                        }
+                    })
+                }).collect::<Vec<_>>()
+            }
+            ChannelOrder::PerChannel => {
+                template_channels.iter().flat_map(|template| {
+                    pixel_keys.iter().map(move |pixel| {
+                        match template {
+                            None => String::new(),
+                            Some(t) => t.replace("$pixelKey", pixel)
+                        }
+                    })
+                }).collect::<Vec<_>>()
+            }
+        };
+
+        Ok(channels)
+    }
+
+    let name =  obj.get("name").ok_or("mode needs a name")?.as_str().ok_or("mode name is not a string")?.to_string();
+    let channels = obj.get("channels").ok_or("mode needs a channels")?.as_array().ok_or("mode channels is not an array")?.iter().map(|c| parse_channel(m, c)).collect::<Result<Vec<_>, _>>()?.into_iter()
+        .flatten().collect::<Vec<_>>();
+
+
+
+    Ok(Mode {
+        channels,
+        name
     })
 }
 
@@ -96,7 +232,7 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
         }
 
         let mut z = Vec::with_capacity(array[2]);
-        z.resize(array[2],Some(Vec::new()));
+        z.resize(array[2],Some(Pixel{ key: String::new(), groups: vec![]}));
 
         let mut y = Vec::with_capacity(array[1]);
         y.resize(array[1], z);
@@ -108,27 +244,27 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
         
         for xs in &mut x {
             for ys in xs {
-                for zs in ys {
-                    if let Some(v) = zs {
-                        v.push(i.to_string());
+                for zs in ys.iter_mut().flatten() {
+                        zs.key = i.to_string();
                         i += 1;
-                    }
                 }
             }
         }
 
         Ok(PixelMatrix {
-            matrix: x,
+            pixels: x,
+            groups: vec![]
         })
     }
 
     fn parse_pixel_keys(src: &Value) -> Result<PixelMatrix, Box<dyn std::error::Error>> {
         let m = src.as_array().ok_or("Matrix pixelKeys not an array")?.iter().map(|v|
             v.as_array().ok_or("Matrix pixelKeys not an 3d array").map(|a| a.iter().map(|v|
-                v.as_array().ok_or("Matrix pixelKeys not an 3d array").map(|a| a.iter().map(|v| v.as_str().map(|s| vec![s.to_string() as PixelGroupIdentifier])).collect::<Vec<_>>())).collect::<Result<Vec<_>, _>>())).collect::<Result<Vec<_>, _>>()?.into_iter().collect::<Result<Vec<_>, _>>()?;
+                v.as_array().ok_or("Matrix pixelKeys not an 3d array").map(|a| a.iter().map(|v| v.as_str().map(|s|Pixel { key: s.to_string(), groups: vec![]})).collect::<Vec<_>>())).collect::<Result<Vec<_>, _>>())).collect::<Result<Vec<_>, _>>()?.into_iter().collect::<Result<Vec<_>, _>>()?;
 
         Ok(PixelMatrix{
-            matrix: m
+            pixels: m,
+            groups: vec![]
         })
     }
 
@@ -141,12 +277,12 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
         fn make_axis_constrained(src: &Value) -> Box<dyn Fn(usize) -> bool> {
             let s = src.as_str().unwrap_or("");
 
-            if s.len() == 0 { Box::new(|_| true) }
-            else if s.starts_with("<=") {let n = s[2..].parse::<usize>().unwrap_or(0); Box::new(move |x| x <= n)}
-            else if s.starts_with(">=") {let n = s[2..].parse::<usize>().unwrap_or(0); Box::new(move |x| x >= n)}
-            else if s.starts_with("<") {let n = s[1..].parse::<usize>().unwrap_or(0); Box::new(move |x| x < n)}
-            else if s.starts_with(">") {let n = s[1..].parse::<usize>().unwrap_or(0); Box::new(move |x| x > n)}
-            else if s.starts_with("=") {let n = s[1..].parse::<usize>().unwrap_or(0); Box::new(move |x| x == n)}
+            if s.is_empty() { Box::new(|_| true) }
+            else if let Some(st) = s.strip_prefix("<=") {let n = st.parse::<usize>().unwrap_or(0); Box::new(move |x| x <= n)}
+            else if let Some(st) = s.strip_prefix(">=") {let n = st.parse::<usize>().unwrap_or(0); Box::new(move |x| x >= n)}
+            else if let Some(st) = s.strip_prefix("<") {let n = st.parse::<usize>().unwrap_or(0); Box::new(move |x| x < n)}
+            else if let Some(st) = s.strip_prefix(">") {let n = st.parse::<usize>().unwrap_or(0); Box::new(move |x| x > n)}
+            else if let Some(st) = s.strip_prefix("=") {let n = st.parse::<usize>().unwrap_or(0); Box::new(move |x| x == n)}
             else if s == "even" {Box::new(|x| x % 2 == 0)}
             else if s == "odd" {Box::new(|x| x % 2 == 1)}
             else {
@@ -155,7 +291,7 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
                     let x1 = ss[1].parse::<usize>().unwrap_or(0);
                     let x2 = ss[1].parse::<usize>().unwrap_or(0);
                     Box::new(move |x: usize| x % x1 == x2)
-                } else if ss.len() == 2 && ss[1] == "" {
+                } else if ss.len() == 2 && ss[1].is_empty() {
                     let n = ss[0].parse::<usize>().unwrap_or(0);
                     Box::new(move |x: usize| x % n == 0)
                 } else {
@@ -165,7 +301,8 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
             }
         }
 
-        fn make_name_constrained(src: &Value) -> Box<dyn Fn(Option<&Vec<PixelGroupIdentifier>>) -> bool> {
+        type ConsFunc = Box<dyn Fn(Option<&Pixel>) -> bool>;
+        fn make_name_constrained(src: &Value) -> ConsFunc {
 
             if src.is_null() {
                 return Box::new(|_| true);
@@ -176,64 +313,57 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
                 log::error!("Matrix name constrained not an array");
                 &empty
             });
-            let mut funcs: Vec<Box<dyn Fn(Option<&Vec<PixelGroupIdentifier>>) -> bool>> = vec![];
+            let mut funcs: Vec<ConsFunc> = vec![];
 
             for s in ss {
                 let s = s.as_str().unwrap_or("");
-            let fun = if s.is_empty() { Box::new(move |_: Option<&Vec<PixelGroupIdentifier>>| true) as Box<dyn Fn(Option<&Vec<PixelGroupIdentifier>>) -> bool>  }
+            let fun = if s.is_empty() { Box::new(move |_: Option<&Pixel>| true) as ConsFunc  }
             else {
                 let regex = regex::Regex::new(s);
                 let b = match regex {
                     Ok(regex) => {
-                        Box::new(move |idents: Option<&Vec<PixelGroupIdentifier>>| {
-                            let r  = if let Some(idents) = idents { idents.iter().map(|ident| regex.is_match(ident)).fold(false, |acc, m| acc || m) } else {
+                        Box::new(move |idents: Option<&Pixel>| {
+                            if let Some(Pixel { key: pixel_key, ..}) = idents { regex.is_match(pixel_key) } else {
                                 false
-                            };
-                            r
+                            }
                         })
                     }
                     Err(e) => {
                         log::error!("Invalid matrix pixelGroup named constrained: {}", e);
-                        Box::new(move |_: Option<&Vec<PixelGroupIdentifier>>| false) as Box<dyn Fn(Option<&Vec<PixelGroupIdentifier>>) -> bool>
+                        Box::new(move |_: Option<&Pixel>| false) as ConsFunc
                     }
                 };
-                b as Box<dyn Fn(Option<&Vec<PixelGroupIdentifier>>) -> bool>
+                b as ConsFunc
             };
                 funcs.push(fun);
             }
 
             Box::new(move |x| {
-                funcs.iter().fold(true, |acc, f| acc && f(x))
+                funcs.iter().all(|f| f(x))
             })
         }
 
-        //TODO: Search on clone to not insert based on inserted
         if let Some(map) = src.as_object() {
             for (k, v) in map {
+                m.groups.push(k.clone());
                 match v {
                     Value::String(all) if all == "all" => {
-                        for x in &mut m.matrix {
+                        for x in &mut m.pixels {
                             for y in x {
-                                for z in y {
-                                    if let Some(l) = z {
-                                        l.push(k.clone());
-                                    }
+                                for z in y.iter_mut().flatten() {
+                                    z.groups.push(k.clone());
                                 }
                             }
                         }
                     }
                     Value::Array(a) => {
-                        //TODO: Does not work as expected
-                        // log::debug!("using pixelGroup array");
                         let a = a.iter().map(|v| v.as_str().ok_or("Wrong pixelGroup type in array").map(|s| s.to_string())).collect::<Result<Vec<_>, _>>()?;
-                        for x in &mut m.matrix {
+                        for x in &mut m.pixels {
                             for y in x {
-                                for z in y {
-                                    if let Some(l) = z {
-                                        for sa in &a {
-                                            if l.contains(sa) {
-                                                l.push(k.clone());
-                                            }
+                                for z in y.iter_mut().flatten() {
+                                    for sa in &a {
+                                        if z.key == *sa {
+                                            z.groups.push(k.clone());
                                         }
                                     }
                                 }
@@ -241,18 +371,18 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
                         }
                     }
                     Value::Object(obj) => {
-                        let xf = make_axis_constrained(&obj.get("x").unwrap_or(&Value::Null));
-                        let yf = make_axis_constrained(&obj.get("y").unwrap_or(&Value::Null));
-                        let zf = make_axis_constrained(&obj.get("z").unwrap_or(&Value::Null));
-                        let name = make_name_constrained(&obj.get("name").unwrap_or(&Value::Null));
+                        let xf = make_axis_constrained(obj.get("x").unwrap_or(&Value::Null));
+                        let yf = make_axis_constrained(obj.get("y").unwrap_or(&Value::Null));
+                        let zf = make_axis_constrained(obj.get("z").unwrap_or(&Value::Null));
+                        let name = make_name_constrained(obj.get("name").unwrap_or(&Value::Null));
 
-                        for (ix, x) in m.matrix.iter_mut().enumerate() {
+                        for (ix, x) in m.pixels.iter_mut().enumerate() {
                             for (iy, y) in x.iter_mut().enumerate() {
                                 for (iz, z) in y.iter_mut().enumerate() {
                                     if xf(ix) && yf(iy) && zf(iz) && name(z.as_ref()) {
                                         match z {
                                             None => {log::debug!("pixelGroup matches even tho pixel is None: Obj: {obj:?}");}
-                                            Some(l) => {l.push(k.clone());}
+                                            Some(l) => {l.groups.push(k.clone());}
                                         }
                                     }
                                 }
@@ -284,4 +414,17 @@ fn parse_matrix(src: &Value) -> Result<Option<PixelMatrix>, Box<dyn std::error::
         }
     }
 
+}
+
+#[cfg(test)]
+mod test {
+    use crate::convert::gen_each_pixel;
+
+    #[test]
+    fn test_gen_each_pixel() {
+        let dims = [2,2,2];
+        let g = gen_each_pixel(dims[0], dims[1], dims[2]);
+        let r = vec!["(1, 1, 1)", "(2, 1, 1)", "(1, 2, 1)", "(2, 2, 1)", "(1, 1, 2)", "(2, 1, 2)", "(1, 2, 2)", "(2, 2, 2)"];
+        assert_eq!(r, g);
+    }
 }

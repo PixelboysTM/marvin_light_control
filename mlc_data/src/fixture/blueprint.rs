@@ -28,7 +28,20 @@ pub type PixelGroupIdentifier = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PixelMatrix {
-    pub matrix: Vec<Vec<Vec<Option<Vec<PixelGroupIdentifier>>>>>
+    pub pixels: Vec<Vec<Vec<Option<Pixel>>>>,
+    pub groups: Vec<PixelGroupIdentifier>
+}
+
+impl PixelMatrix {
+    pub fn dimensions(&self) -> [usize; 3] {
+        [self.pixels.len(), self.pixels[0].len(),  self.pixels[0][0].len()]
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Pixel {
+    pub key: String,
+    pub groups: Vec<PixelGroupIdentifier>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -238,6 +251,6 @@ pub enum CapabilityKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mode {
-    name: String,
-    channel: Vec<ChannelIdentifier>,
+    pub name: String,
+    pub channels: Vec<ChannelIdentifier>, //TODO: To prevent "" make into option for unused channels
 }
