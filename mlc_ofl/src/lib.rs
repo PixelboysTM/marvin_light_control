@@ -8,7 +8,7 @@ mod convert;
 
 const OFL_URL: &str = "https://open-fixture-library.org/download.ofl";
 
-pub async fn create_lib(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn create_lib(path: &Path, pretty: bool) -> Result<(), Box<dyn std::error::Error>> {
     let time = Instant::now();
 
     let zip = reqwest::get(OFL_URL).await?.error_for_status()?.bytes().await?;
@@ -36,7 +36,11 @@ pub async fn create_lib(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Writing Blueprints to disk...");
     let out_file = File::create(path)?;
 
-    serde_json::to_writer_pretty(&out_file, &blueprints)?;
+    if pretty {
+        serde_json::to_writer_pretty(out_file, &blueprints)?;
+    } else {
+        serde_json::to_writer(out_file, &blueprints)?;
+    }
 
     let elapsed = time.elapsed();
 

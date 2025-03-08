@@ -9,6 +9,10 @@ pub mod bounded;
 pub mod fixture;
 pub mod project;
 
+pub type DynamicError = Box<dyn std::error::Error>;
+pub type DynamicResult<T> = Result<T, DynamicError>;
+
+
 pub type Percentage = BoundedValue<f32, Zero, One>;
 pub type TrippleDMXValue = BoundedValue<
     u32,
@@ -43,7 +47,7 @@ impl DmxGranularity {
         match self {
             DmxGranularity::Single => u8::MAX as u32,
             DmxGranularity::Double => u16::MAX as u32,
-            DmxGranularity::Tripple => 2 ^ 24 - 1,
+            DmxGranularity::Tripple => 2_u32.pow(24) - 1,
         }
     }
 }

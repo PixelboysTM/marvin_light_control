@@ -75,7 +75,7 @@ pub enum RotationAngle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationSpeed {
     Hertz(f32),
-    RPM(u32),
+    RPM(f32),
     Percent(Percentage),
     FastCW,
     SlowCW,
@@ -114,9 +114,9 @@ pub enum Color {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DynamicColor {
-    r: u8,
-    g: u8,
-    b: u8,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,7 +131,7 @@ pub enum Brightness {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Time {
     Seconds(f32),
-    Milliseconds(u32),
+    Milliseconds(f32),
     Percent(Percentage),
     Instant,
     Short,
@@ -141,7 +141,7 @@ pub enum Time {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Speed {
     Hertz(f32),
-    Bpm(u32),
+    Bpm(f32),
     Percent(Percentage),
     Fast,
     Slow,

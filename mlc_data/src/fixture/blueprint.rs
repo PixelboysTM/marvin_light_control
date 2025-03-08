@@ -69,6 +69,7 @@ pub struct Physical {
 pub type ChannelIdentifier = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "precision")]
 pub enum Channel {
     Single {
         #[serde(flatten)]
@@ -90,8 +91,8 @@ pub enum Channel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommonChannel {
     #[serde(default = "default_percentage")]
-    default_value: Percentage,
-    capabilities: Vec<Capability>
+    pub default_value: Percentage,
+    pub capabilities: Vec<Capability>
 }
 
 fn default_percentage() -> Percentage {
@@ -100,14 +101,15 @@ fn default_percentage() -> Percentage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capability {
-    range: RangeInclusive<Percentage>,
+    pub range: RangeInclusive<Percentage>,
     #[serde(default)]
-    pixel: PixelIdentifier,
-    comment: Option<String>,
+    pub pixel: PixelIdentifier,
+    pub comment: Option<String>,
     #[serde(flatten)]
-    kind: CapabilityKind,
+    pub kind: CapabilityKind,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum CapabilityKind {
     NoFunction,
     Generic,
@@ -132,7 +134,7 @@ pub enum CapabilityKind {
         color: Color,
     },
     ColorPreset {
-        colors: Vec<MaybeLinear<DynamicColor>>,
+        colors: MaybeLinear<Vec<DynamicColor>>,
         color_temperature: Option<MaybeLinear<ColorTemperature>>
     },
     ColorTemperature {
@@ -155,8 +157,8 @@ pub enum CapabilityKind {
         duration: Option<MaybeLinear<Time>>
     },
     WheelSlot {
-        wheel: String,
-        slot_number: MaybeLinear<u32>,
+        wheel: Option<String>,
+        slot_number: MaybeLinear<f32>,
     },
     //TODO: Implement
     WheelShake,
@@ -252,5 +254,5 @@ pub enum CapabilityKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mode {
     pub name: String,
-    pub channels: Vec<ChannelIdentifier>, //TODO: To prevent "" make into option for unused channels
+    pub channels: Vec<Option<ChannelIdentifier>>,
 }

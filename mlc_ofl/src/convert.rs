@@ -1,7 +1,12 @@
 use std::collections::HashMap;
-use serde_json::Value;
-use mlc_data::fixture::blueprint::{ChannelIdentifier, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelMatrix};
+use serde_json::{Map, Value};
+use mlc_data::{DmxGranularity, DynamicError, DynamicResult, GenericDMXValue, MaybeLinear, Percentage, PercentageDmxExt};
+use mlc_data::fixture::blueprint::{Capability, CapabilityKind, Channel, ChannelIdentifier, CommonChannel, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelMatrix};
+use mlc_data::fixture::blueprint::entities::{Brightness, ShutterEffect};
 use mlc_data::project::ToFileName;
+use crate::convert::helpers::{parse_beam_angle, parse_brightness, parse_color, parse_color_temperature, parse_distance, parse_dynamic_color, parse_fog_kind, parse_fog_output, parse_horizontal_angle, parse_maybe_linear, parse_optional_bool, parse_optional_maybe_linear, parse_parameter, parse_percentage, parse_rotation_angle, parse_rotation_speed, parse_speed, parse_time, parse_vec, parse_vertical_angle};
+
+mod helpers;
 
 pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBlueprint, Box<dyn std::error::Error>> {
     let meta = parse_metadata(ofl_source, manufacturer)?;
@@ -12,16 +17,11 @@ pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBluepr
     let modes = parse_modes(matrix.as_ref(), &ofl_source["modes"])?;
 
 
-    let wheels = {
-        log::warn!("Wheel parsing not yet implemented");
-        None
-    };
+    let wheels = parse_wheels(&ofl_source["wheels"])?;
 
 
-    let channels = {
-        log::warn!("Channel parsing not yet implemented");
-        HashMap::new()
-    };
+    //TODO: parse templateChannels
+    let channels = parse_channels(&ofl_source["availableChannels"])?;
 
     Ok(FixtureBlueprint {
         meta,
@@ -30,6 +30,270 @@ pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBluepr
         wheels,
         channels
     })
+}
+
+fn parse_channels(src: &Value) -> Result<HashMap<ChannelIdentifier, Channel>, Box<dyn std::error::Error>> {
+    if src.is_null() { return Ok(HashMap::new()) }
+
+    let obj = src.as_object().ok_or("'availableChannels' if present must be an object")?;
+
+    let mut channels = HashMap::new();
+    for (k,v) in obj {
+        let channel = parse_channel(v)?;
+        channels.insert(k.clone(), channel);
+    }
+
+    Ok(channels)
+}
+
+fn parse_channel(src: &Value) -> DynamicResult<Channel> {
+    let obj = src.as_object().ok_or("channel must be an object")?;
+
+    let granularity = obj.get("fineChannelAliases").and_then(|v| v.as_array()).map(|v| v.iter().map(|a| a.as_str().ok_or("fineChannelAlias must be an string")).collect::<Result<Vec<_>, _>>()).transpose()?.unwrap_or(vec![]);
+
+    let common = parse_common_channel(obj, match granularity.len() { 0 => DmxGranularity::Single, 1 => DmxGranularity::Double, 2 => DmxGranularity::Tripple, _ => DmxGranularity::Single })?;
+
+    match granularity.as_slice() {
+        [] => Ok(Channel::Single {
+            channel: common
+        }),
+        [fine] => Ok(Channel::Double {
+            channel: common,
+            second_channel_name: fine.to_string(),
+        }),
+        [fine, grain] => Ok(Channel::Tripple {
+            channel: common,
+            second_channel_name: fine.to_string(),
+            third_channel_name: grain.to_string(),
+        }),
+        _ => Err(format!("Unsupported channel granularity {}", granularity.len()).into())
+    }
+}
+
+fn parse_common_channel(obj: &Map<String, Value>, granularity: DmxGranularity) -> DynamicResult<CommonChannel> {
+    let value_resolution = obj.get("dmxValueResolution").map(|r| r.as_str().ok_or("valueResolution must be a string".to_string()).and_then(|s| match s {
+        "8bit" => Ok(DmxGranularity::Single),
+        "16bit" => Ok(DmxGranularity::Double),
+        "24bit" => Ok(DmxGranularity::Tripple),
+        _=> Err(format!("Unsupported dmxValueResolution {}", s))
+    })).unwrap_or(Ok(granularity))?;
+
+    let default_value = obj.get("default_value").map(|v| match v {
+        Value::Number(number) => Ok(number.as_u64().ok_or("default_value must be unsigned int".to_string()).map(|v| Percentage::from_gen_dmx(GenericDMXValue::create(v as u32), value_resolution))?),
+        Value::String(s) if s.ends_with("%") => Ok(s[..s.len() - 1].parse::<f32>().map(Percentage::create)?),
+        _ => Err(<&str as Into<DynamicError>>::into("invalid defaultValue")),
+    }).unwrap_or(Ok(Percentage::create(0.0)))?;
+
+    let caps_decide = (obj.contains_key("capability"), obj.contains_key("capabilities"));
+
+    let caps = match caps_decide {
+        (true, false) => vec![parse_capability(&obj["capability"], true, value_resolution)?],
+            (false, true) => {
+            let caps = obj["capabilities"].as_array().ok_or("capabilities must be an array")?;
+            caps.iter().map(|c| parse_capability(c, false, value_resolution)).collect::<Result<Vec<_>, _>>()?
+        },
+        _ => {
+            log::debug!("No capabilities specified");
+            vec![]
+        }
+     };
+
+    Ok(CommonChannel {
+        default_value,
+        capabilities: caps
+    })
+}
+
+fn parse_capability(src: &Value, is_single: bool, granularity: DmxGranularity) -> Result<Capability, Box<dyn std::error::Error>> {
+    let obj = src.as_object().ok_or("capability must be an object")?;
+
+    let range = if is_single {
+        Percentage::create(0.0)..=Percentage::create(1.0)
+    } else {
+        let range = src.get("dmxRange").and_then(|v| v.as_array().map(|v| v.iter().map(|d| d.as_u64().ok_or("dmxValue in range must be an unsigned int").map(|d| Percentage::from_gen_dmx(GenericDMXValue::create(d as u32), granularity))).collect::<Result<Vec<_>, _>>())).ok_or("dmxRange must be present")??;
+        if range.len() != 2 {
+            return Err("dmxRange must contain exactly two values".into());
+        }
+        range[0]..=range[1]
+    };
+
+    let comment = obj.get("comment").map(|c| c.as_str().map(|s| s.to_string()).ok_or("comment must be a string")).transpose()?;
+
+    let kind = parse_capability_kind(obj)?;
+
+    Ok(Capability {
+        range,
+        comment,
+        kind,
+        pixel: PixelIdentifier::Master //TODO: Change later for template channels
+    })
+}
+
+fn parse_capability_kind(obj: &Map<String, Value>) -> DynamicResult<CapabilityKind> {
+    let kind = obj.get("type").and_then(|v| v.as_str()).ok_or("capability type must be a string")?;
+
+    let cap = match kind {
+        "NoFunction" => CapabilityKind::NoFunction,
+        "ShutterStrobe" => CapabilityKind::ShutterStrobe {
+            sound_controlled: parse_optional_bool(obj, "soundControlled")?.unwrap_or(false),
+            random_timing: parse_optional_bool(obj, "randomTiming")?.unwrap_or(false),
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?,
+            duration: parse_optional_maybe_linear(obj, "duration", parse_time)?,
+            effect: match obj.get("shutterEffect").and_then(|v| v.as_str()).ok_or("shutterEffect must be a string and present")? {
+                "Open" => ShutterEffect::Open,
+                "Closed" => ShutterEffect::Closed,
+                "Strobe" => ShutterEffect::Strobe,
+                "Pulse" => ShutterEffect::Pulse,
+                "RampUp" => ShutterEffect::RampUp,
+                "RampDown" => ShutterEffect::RampDown,
+                "RampUpDown" => ShutterEffect::RampUpDown,
+                "Lightning" => ShutterEffect::Lightning,
+                "Spikes" => ShutterEffect::Spikes,
+                "Burst" => ShutterEffect::Burst,
+                _=> return Err(format!("Unsupported shutterEffect {}", kind).into())
+            },
+        },
+        "StrobeSpeed" => CapabilityKind::StrobeSpeed {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?.ok_or("Speed must be present")?,
+        },
+        "StrobeDuration" => CapabilityKind::StrobeDuration {
+            duration: parse_optional_maybe_linear(obj, "duration", parse_time)?.ok_or("Speed must be present")?,
+        },
+        "Intensity" => CapabilityKind::Intensity {
+          brightness: parse_optional_maybe_linear(obj, "brightness", parse_brightness)?.unwrap_or(MaybeLinear::Linear {
+              start: Brightness::Off,
+              end: Brightness::Bright,
+          }),
+        },
+        "ColorIntensity" => CapabilityKind::ColorIntensity {
+            brightness: parse_optional_maybe_linear(obj, "brightness", parse_brightness)?.unwrap_or(MaybeLinear::Linear {
+                start: Brightness::Off,
+                end: Brightness::Bright,
+            }),
+            color: parse_color(obj.get("color").ok_or("color must be present")?)?,
+        },
+        "ColorPreset" => CapabilityKind::ColorPreset {
+            colors: parse_optional_maybe_linear(obj, "colors", |v| parse_vec(v, parse_dynamic_color))?.ok_or("colorPreset must have colors")?,
+            color_temperature: parse_optional_maybe_linear(obj, "colorTemperature", parse_color_temperature)?,
+        },
+        "Pan" => CapabilityKind::Pan {
+            angle: parse_optional_maybe_linear(obj, "angle", parse_rotation_angle)?.ok_or("Rotation angle must be present")?,
+        },
+        "PanContinuous" => CapabilityKind::PanContinuous {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_rotation_speed)?.ok_or("Rotation speed must be present")?,
+        },
+        "Tilt" => CapabilityKind::Tilt {
+            angle: parse_optional_maybe_linear(obj, "angle", parse_rotation_angle)?.ok_or("Rotation angle must be present")?,
+        },
+        "TiltContinuous" => CapabilityKind::TiltContinuous {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_rotation_speed)?.ok_or("Rotation speed must be present")?,
+        },
+        "PanTiltSpeed" => CapabilityKind::PanTiltSpeed {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?.ok_or("speed must be present")?,
+            duration: parse_optional_maybe_linear(obj, "duration", parse_time)?,
+        },
+        "WheelSlot" => CapabilityKind::WheelSlot {
+            wheel: obj.get("wheel").map(|v| v.as_str().map(|s| s.to_string()).ok_or("wheel must be a string")).transpose()?,
+            slot_number: parse_optional_maybe_linear(obj, "slotNumber", |v| v.as_f64().map(|u| u as f32).ok_or("slotNumber must be a unsigned number".into()))?.ok_or("slotNumber must be present")?,
+        },
+        "WheelShake" => CapabilityKind::WheelShake,
+        "WheelSlotRotation" => CapabilityKind::WheelSlotRotation,
+        "WheelRotation" => CapabilityKind::WheelRotation,
+        "Effect" => CapabilityKind::Effect {
+            name: obj.get("effectName").and_then(|v| v.as_str().map(|s| s.to_string())).ok_or("Effect must have name")?,
+            preset: obj.get("effectPreset").and_then(|v| v.as_str().map(|s| s.to_string())).ok_or("Effect must have preset")?,
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?,
+            duration: parse_optional_maybe_linear(obj, "duration", parse_time)?,
+            parameter: parse_optional_maybe_linear(obj, "parameter", parse_parameter)?,
+            sound_controlled: parse_optional_bool(obj, "soundControlled")?.unwrap_or(false),
+            sound_sensitivity: parse_optional_maybe_linear(obj, "soundSensitivity", parse_percentage)?,
+        },
+        "EffectSpeed" => CapabilityKind::EffectSpeed {
+            speed: parse_maybe_linear(obj, "speed", parse_speed)?,
+        },
+        "EffectDuration" => CapabilityKind::EffectDuration {
+            duration: parse_maybe_linear(obj, "duration", parse_time)?,
+        },
+        "EffectParameter" => CapabilityKind::EffectParameter {
+            parameter: parse_maybe_linear(obj, "effectParameter", parse_parameter)?,
+        },
+        "SoundSensitivity" => CapabilityKind::SoundSensitivity {
+            sensitivity: parse_maybe_linear(obj, "soundSensitivity", parse_percentage)?,
+        },
+        "BeamAngle" => CapabilityKind::BeamAngle {
+            angle: parse_maybe_linear(obj, "angle", parse_beam_angle)?,
+        },
+        "BeamPosition" => CapabilityKind::BeamPosition {
+            horizontal_angle: parse_optional_maybe_linear(obj, "horizontalAngle", parse_horizontal_angle)?,
+            vertical_angle: parse_optional_maybe_linear(obj, "verticalAngle", parse_vertical_angle)?,
+        },
+        "Focus" => CapabilityKind::Focus {
+            distance: parse_maybe_linear(obj, "distance", parse_distance)?,
+        },
+        "Zoom" => CapabilityKind::Zoom {
+            angle: parse_maybe_linear(obj, "angle", parse_beam_angle)?,
+        },
+        "Iris" => CapabilityKind::Iris {
+            open_percent: parse_maybe_linear(obj, "openPercent", parse_percentage)?,
+        },
+        "IrisEffect" => CapabilityKind::IrisEffect {
+            name: obj.get("effectName").and_then(|v| v.as_str().map(|s| s.to_string())).ok_or("IrisEffect must have name")?,
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?,
+        },
+        "Frost" => CapabilityKind::Frost {
+            intensity: parse_maybe_linear(obj, "frostIntensity", parse_percentage)?,
+        },
+        "FrostEffect" => CapabilityKind::FrostEffect {
+            name: obj.get("effectName").and_then(|v| v.as_str().map(|s| s.to_string())).ok_or("FrostEffect must have name")?,
+            speed: parse_optional_maybe_linear(obj, "speed", parse_speed)?,
+        },
+        "Prism" => CapabilityKind::Prism {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_rotation_speed)?,
+            angle: parse_optional_maybe_linear(obj, "angle", parse_rotation_angle)?,
+        },
+        "PrismRotation" => CapabilityKind::PrismRotation {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_rotation_speed)?,
+            angle: parse_optional_maybe_linear(obj, "angle", parse_rotation_angle)?,
+        },
+        "BladeInsertion" => CapabilityKind::BladeInsertion,
+        "BladeRotation" => CapabilityKind::BladeRotation,
+        "BladeSystemRotation" => CapabilityKind::BladeSystemRotation,
+        "Fog" => CapabilityKind::Fog {
+            kind: parse_fog_kind(obj.get("fogType").unwrap_or(&Value::String("Fog".to_string())))?,
+            output: parse_optional_maybe_linear(obj, "fogOutput", parse_fog_output)?,
+        },
+        "FogOutput" => CapabilityKind::FogOutput {
+            output: parse_maybe_linear(obj, "fogOutput", parse_fog_output)?,
+        },
+        "FogType" => CapabilityKind::FogType {
+            kind: parse_fog_kind(obj.get("fogType").ok_or("fogType must be present")?)?,
+        },
+        "Rotation" => CapabilityKind::Rotation {
+            speed: parse_optional_maybe_linear(obj, "speed", parse_rotation_speed)?,
+            angle: parse_optional_maybe_linear(obj, "angle", parse_rotation_angle)?,
+        },
+        "Speed" => CapabilityKind::Speed {
+            speed: parse_maybe_linear(obj, "speed", parse_speed)?,
+        },
+        "Time" => CapabilityKind::Time {
+            time: parse_maybe_linear(obj, "time", parse_time)?,
+        },
+        "Maintenance" => CapabilityKind::Maintenance {
+            parameter: parse_optional_maybe_linear(obj, "parameter", parse_parameter)?,
+            hold: if let Some(v) = obj.get("hold") { Some(parse_time(v)?) } else { None },
+        },
+        "Generic" => CapabilityKind::Generic,
+        _ => return Err("Unknown capability type".into()),
+    };
+    Ok(cap)
+}
+
+fn parse_wheels(src: &Value) -> Result<Option<Vec<()>>, Box<dyn std::error::Error>> {
+    if src.is_null() { return Ok(None); }
+
+    log::warn!("Wheel parsing not yet implemented");
+    Ok(Some(vec![]))
+
 }
 
 fn parse_modes(m: Option<&PixelMatrix>,src: &Value) -> Result<Vec<Mode>, Box<dyn std::error::Error>> {
@@ -57,9 +321,9 @@ fn gen_each_pixel(f: usize, s: usize, t: usize) -> Vec<String> {
 fn parse_mode(m: Option<&PixelMatrix>,src: &Value) -> Result<Mode, Box<dyn std::error::Error>> {
     let obj = src.as_object().ok_or("mode is not an object")?;
 
-    fn parse_channel(m: Option<&PixelMatrix>,src: &Value) -> Result<Vec<ChannelIdentifier>, Box<dyn std::error::Error>> {
-        if src.is_null() { return Ok(vec![ChannelIdentifier::default()]) }
-        if let Some(str) = src.as_str() {return Ok(vec![str.to_string()]) }
+    fn parse_channel(m: Option<&PixelMatrix>,src: &Value) -> Result<Vec<Option<ChannelIdentifier>>, Box<dyn std::error::Error>> {
+        if src.is_null() { return Ok(vec![None]) }
+        if let Some(str) = src.as_str() {return Ok(vec![Some(str.to_string())]) }
 
         let obj = src.as_object().ok_or("mode must be one of null, string or object")?;
         obj.get("insert").and_then(|s| s.as_str()).and_then(|s| if s == "matrixChannels" {Some(())} else {None}).ok_or("object mode must contain 'insert: matrixChannels'")?;
@@ -107,7 +371,7 @@ fn parse_mode(m: Option<&PixelMatrix>,src: &Value) -> Result<Mode, Box<dyn std::
                 Value::String(s) if s == "eachPixelZXY" => Some(RepeatFor::EachPixelZXY),
                 Value::String(s) if s == "eachPixelZYX" => Some(RepeatFor::EachPixelZYX),
                 Value::String(s) if s == "eachPixelGroup" => Some(RepeatFor::EachPixelGroup),
-                Value::Array(arr ) => arr.iter().map(|v| v.as_str().map(|s| s.to_string())).collect::<Option<Vec<_>>>().map(|v| RepeatFor::Keys(v)),
+                Value::Array(arr ) => arr.iter().map(|v| v.as_str().map(|s| s.to_string())).collect::<Option<Vec<_>>>().map(RepeatFor::Keys),
                 _ => None
             }
         }).ok_or("repeatFor is invalid")?;
@@ -131,26 +395,18 @@ fn parse_mode(m: Option<&PixelMatrix>,src: &Value) -> Result<Mode, Box<dyn std::
             RepeatFor::Keys(keys) => keys
         };
 
-        //TODO: Gen channels
-
         let channels = match channel_order {
             ChannelOrder::PerPixel => {
                 pixel_keys.iter().flat_map(|pixel| {
                     template_channels.iter().map(|template| {
-                        match template {
-                            Some(t ) => t.replace("$pixelKey",  pixel),
-                            None => String::new()
-                        }
+                        template.as_ref().map(|t| t.replace("$pixelKey", pixel))
                     })
                 }).collect::<Vec<_>>()
             }
             ChannelOrder::PerChannel => {
                 template_channels.iter().flat_map(|template| {
                     pixel_keys.iter().map(move |pixel| {
-                        match template {
-                            None => String::new(),
-                            Some(t) => t.replace("$pixelKey", pixel)
-                        }
+                        template.as_ref().map(|t| t.replace("$pixelKey", pixel))
                     })
                 }).collect::<Vec<_>>()
             }
