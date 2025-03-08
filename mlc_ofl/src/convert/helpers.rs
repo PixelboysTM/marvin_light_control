@@ -3,6 +3,8 @@ use serde_json::{Map, Value};
 use mlc_data::{DynamicResult, MaybeLinear, Percentage};
 use mlc_data::fixture::blueprint::entities::{BeamAngle, Brightness, Color, ColorTemperature, Distance, DynamicColor, FogKind, FogOutput, HorizontalAngle, Parameter, RotationAngle, RotationSpeed, Speed, Time, VerticalAngle};
 
+//TODO: Convert into ParseFromValue and ParseFromObject traits 
+
 pub fn parse_optional_bool(obj: &Map<String, Value>, key: &str) -> DynamicResult<Option<bool>> {
     Ok(obj.get(key).map(|v| v.as_bool().ok_or("must be a bool")).transpose()?)
 }

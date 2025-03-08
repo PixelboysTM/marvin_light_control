@@ -8,6 +8,8 @@ use crate::convert::helpers::{parse_beam_angle, parse_brightness, parse_color, p
 
 mod helpers;
 
+
+
 pub fn convert(ofl_source: &Value, manufacturer: String) -> Result<FixtureBlueprint, Box<dyn std::error::Error>> {
     let meta = parse_metadata(ofl_source, manufacturer)?;
 
