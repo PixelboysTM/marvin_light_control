@@ -22,7 +22,7 @@ pub trait OutOfBoundsHandler<T> {
 
 impl<T: Debug> OutOfBoundsHandler<T> for () {
     fn handle(bound: T, value: T, exceeded_bound: ExceededBound) {
-        println!(
+        eprintln!(
             "Bound value: {:?} to bound: {:?} ({})",
             value,
             bound,
@@ -34,9 +34,9 @@ impl<T: Debug> OutOfBoundsHandler<T> for () {
     }
 }
 
-pub struct OOBPanicer;
+pub struct OOPPanic;
 
-impl<T: Debug> OutOfBoundsHandler<T> for OOBPanicer {
+impl<T: Debug> OutOfBoundsHandler<T> for OOPPanic {
     fn handle(bound: T, value: T, exceeded_bound: ExceededBound) {
         panic!(
             "Value: {:?} exceeded bound: {:?} ({})",
@@ -57,6 +57,7 @@ impl<T> OutOfBoundsHandler<T> for OOBIgnorer {
 }
 
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct BoundedValue<T, MIN: Bounds<T>, MAX: Bounds<T>, H = ()> {
     value: T,
     _min: PhantomData<MIN>,

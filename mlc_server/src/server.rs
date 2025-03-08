@@ -18,7 +18,7 @@ use crate::ServiceImpl;
 pub async fn setup_server(port: u16, service_obj: Arc<RwLock<ServiceImpl>>) {
     log::info!("Starting Server...");
 
-    log::info!("Listenting on port {}", port);
+    log::info!("Listening on port {}", port);
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, port))
         .await
         .unwrap();
@@ -61,7 +61,7 @@ pub async fn setup_server(port: u16, service_obj: Arc<RwLock<ServiceImpl>>) {
                     .await
                     .unwrap();
                 }
-                com::general_service::GeneralServiceIdent::IDENT => {
+                general_service::GeneralServiceIdent::IDENT => {
                     create::<_, general_service::GeneralServiceServerSharedMut<_>>(
                         service_obj,
                         socket_rx,
@@ -86,7 +86,7 @@ async fn create<T: Send + Sync + 'static, S: ServerSharedMut<T, remoc::codec::De
     ident: String,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    <S as ServerBase>::Client: mlc_communication::remoc::RemoteSend,
+    <S as ServerBase>::Client: RemoteSend,
 {
     let (server, client) = S::new(service_obj, 1);
 
