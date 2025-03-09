@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tokio::time::Instant;
+use mlc_data::misc::ContextError;
 use crate::convert::convert;
 
 mod convert;
@@ -26,7 +27,7 @@ pub async fn create_lib(path: &Path, pretty: bool) -> Result<(), Box<dyn std::er
         log::info!("Parsing: {}:{}", manu, name);
         let data: String = String::from_utf8( file.bytes().collect::<Result<Vec<u8>, _>>()?)?;
 
-        let blueprint = convert(&serde_json::from_str(&data)?, manu.to_string())?;
+        let blueprint = convert(&serde_json::from_str(&data)?, manu.to_string()).map_err(ContextError::to_generic)?;
         blueprints.push(blueprint);
     }
     

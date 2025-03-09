@@ -4,13 +4,16 @@ use bounded::{
     BoundedValue,
     bounds::{DynamicU8, DynamicU16, DynamicU32, One, Zero},
 };
+use crate::misc::ContextError;
 
 pub mod bounded;
 pub mod fixture;
 pub mod project;
+pub mod misc;
 
 pub type DynamicError = Box<dyn std::error::Error>;
 pub type DynamicResult<T> = Result<T, DynamicError>;
+pub type ContextResult<T> = Result<T, ContextError>;
 
 
 pub type Percentage = BoundedValue<f32, Zero, One>;

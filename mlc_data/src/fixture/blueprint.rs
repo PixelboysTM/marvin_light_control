@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
+use either::Either;
 use serde::{Deserialize, Serialize};
 use crate::{MaybeLinear, Percentage};
 use entities::*;
@@ -165,8 +166,9 @@ pub enum CapabilityKind {
     WheelSlotRotation,
     WheelRotation,
     Effect {
-        name: String,
-        preset: String,
+        preset_or_name: Either<Preset, String>,
+        // name: String,
+        // preset: String, //TODO: Make Into Actual preset and merge with name
         speed: Option<MaybeLinear<Speed>>,
         duration: Option<MaybeLinear<Time>>,
         parameter: Option<MaybeLinear<Parameter>>,

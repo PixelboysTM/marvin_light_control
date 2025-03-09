@@ -163,3 +163,9 @@ pub enum ShutterEffect {
     Spikes,
     Burst
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Preset {
+    ColorJump,
+    ColorFade,
+}
