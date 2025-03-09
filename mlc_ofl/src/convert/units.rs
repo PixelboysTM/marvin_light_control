@@ -1,9 +1,9 @@
 use serde_json::Value;
 use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
 use mlc_data::fixture::blueprint::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, Seconds, SignedPercentage, VolumePerMin, BPM, RPM};
-use crate::convert::Parseable;
+use crate::convert::parseable::{Parseable, SimpleParseable};
 
-impl Parseable for SignedPercentage {
+impl SimpleParseable for SignedPercentage {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("SignedPercentage must be a string"))?;
 
@@ -17,7 +17,7 @@ impl Parseable for SignedPercentage {
     }
 }
 
-impl Parseable for Percentage {
+impl SimpleParseable for Percentage {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Percentage must be a string"))?;
 
@@ -31,7 +31,7 @@ impl Parseable for Percentage {
     }
 }
 
-impl Parseable for Hz {
+impl SimpleParseable for Hz {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Hz must be a string"))?;
 
@@ -43,7 +43,7 @@ impl Parseable for Hz {
     }
 }
 
-impl Parseable for BPM {
+impl SimpleParseable for BPM {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("BPM must be a string"))?;
 
@@ -55,7 +55,7 @@ impl Parseable for BPM {
     }
 }
 
-impl Parseable for RPM {
+impl SimpleParseable for RPM {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("RPM must be a string"))?;
 
@@ -67,7 +67,7 @@ impl Parseable for RPM {
     }
 }
 
-impl Parseable for Seconds {
+impl SimpleParseable for Seconds {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Seconds must be a string"))?;
 
@@ -79,7 +79,7 @@ impl Parseable for Seconds {
     }
 }
 
-impl Parseable for MilliSeconds {
+impl SimpleParseable for MilliSeconds {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Milliseconds must be a string"))?;
 
@@ -91,7 +91,7 @@ impl Parseable for MilliSeconds {
     }
 }
 
-impl Parseable for Meters {
+impl SimpleParseable for Meters {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Meters must be a string"))?;
 
@@ -103,7 +103,7 @@ impl Parseable for Meters {
     }
 }
 
-impl Parseable for Lumen {
+impl SimpleParseable for Lumen {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Lumen must be a string"))?;
 
@@ -115,7 +115,7 @@ impl Parseable for Lumen {
     }
 }
 
-impl Parseable for Kelvin {
+impl SimpleParseable for Kelvin {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Kelvin must be a string"))?;
 
@@ -127,7 +127,7 @@ impl Parseable for Kelvin {
     }
 }
 
-impl Parseable for VolumePerMin {
+impl SimpleParseable for VolumePerMin {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("VolumePerMin must be a string"))?;
 
@@ -139,7 +139,7 @@ impl Parseable for VolumePerMin {
     }
 }
 
-impl Parseable for Degree {
+impl SimpleParseable for Degree {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Degree must be a string"))?;
 

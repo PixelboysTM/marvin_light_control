@@ -1,17 +1,17 @@
-use crate::convert::Parseable;
+use crate::convert::parseable::{Parseable, SimpleParseable, SimpleParseableMarker};
 use crate::convert::parse_helpers::{ParseExecutorObj, ParseExecutorValue};
 use either::Either;
 use mlc_data::{ContextResult, MaybeLinear, err, misc::ContextError};
 use serde_json::{Map, Value};
 use std::fmt::Debug;
 
-impl Parseable for bool {
+impl SimpleParseable for bool {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         value.as_bool().ok_or(err!("Value must be a bool"))
     }
 }
 
-impl Parseable for String {
+impl SimpleParseable for String {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         value
             .as_str()
@@ -20,7 +20,7 @@ impl Parseable for String {
     }
 }
 
-impl Parseable for f32 {
+impl SimpleParseable for f32 {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         value
             .as_f64()
@@ -29,7 +29,7 @@ impl Parseable for f32 {
     }
 }
 
-impl Parseable for Value {
+impl SimpleParseable for Value {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         Ok(value.clone())
     }
@@ -37,7 +37,7 @@ impl Parseable for Value {
 
 impl<T> Parseable for Option<T>
 where
-    T: Parseable,
+    T: Parseable + SimpleParseableMarker,
 {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         if value.is_null() {
@@ -81,31 +81,21 @@ where
     }
 }
 
-pub trait CustomOptionalParser: Sized {
-    type Out;
-    fn require(self) -> ContextResult<Self::Out>;
-    fn require_default(self, default: Self::Out) -> ContextResult<Self::Out> {
-        Ok(self.require().unwrap_or(default))
-    }
-}
-
-impl<T> CustomOptionalParser for ContextResult<Option<MaybeLinear<T>>>
+impl<T> Parseable for MaybeLinear<T>
 where
-    T: Parseable + Debug + Clone,
-{
-    type Out = MaybeLinear<T>;
-
-    fn require(self) -> ContextResult<Self::Out> {
-        match self? {
-            Some(v) => Ok(v),
-            None => Err(err!("MaybeLinear is required to be Some")),
-        }
+    T: Parseable + Debug + Clone, {
+    fn parse_from_value(value: &Value) -> ContextResult<Self> {
+        <Option<MaybeLinear<T>> as Parseable>::parse_from_value(value)?.ok_or(err!("MaybeLinear is required to be Some"))
     }
+    fn parse_from_object(obj: &Map<String, Value>, key: &str) -> ContextResult<Self> {
+        <Option<MaybeLinear<T>> as Parseable>::parse_from_object(obj, key)?.ok_or(err!("MaybeLinear is required to be Some"))
+    }
+
 }
 
 
 
-impl<T> Parseable for Vec<T>
+impl<T> SimpleParseable for Vec<T>
 where
     T: Parseable,
 {
@@ -145,6 +135,16 @@ where
     }
 }
 
+impl<L, R> Parseable for Either<L, R> where L: Parseable, R: Parseable  {
+    fn parse_from_value(value: &Value) -> ContextResult<Self> {
+        <Option<Either<L, R>> as Parseable>::parse_from_value(value)?.ok_or(err!("Either is required but none of the values could be parsed"))
+    }
+
+    fn parse_from_object(obj: &Map<String, Value>, key: &str) -> ContextResult<Self> {
+        <Option<Either<L, R>> as Parseable>::parse_from_object(obj, key)?.ok_or(err!("Either is required but none of the values could be parsed"))
+    }
+}
+
 fn decide<L, R>(
     left: ContextResult<L>,
     right: ContextResult<R>,
@@ -153,19 +153,5 @@ fn decide<L, R>(
         (Ok(l), _) => Ok(Some(Either::Left(l))),
         (Err(_), Ok(r)) => Ok(Some(Either::Right(r))),
         _ => Ok(None),
-    }
-}
-
-impl<L, R> CustomOptionalParser for ContextResult<Option<Either<L, R>>>
-where
-    L: Parseable,
-    R: Parseable,
-{
-    type Out = Either<L, R>;
-
-    fn require(self) -> ContextResult<Self::Out> {
-        self?.ok_or(err!(
-            "Either is required but none of the values could be parsed"
-        ))
     }
 }

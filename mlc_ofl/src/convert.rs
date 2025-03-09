@@ -4,24 +4,15 @@ use serde_json::{Map, Value};
 use mlc_data::{err, DmxGranularity, ContextResult, GenericDMXValue, MaybeLinear, Percentage, PercentageDmxExt};
 use mlc_data::fixture::blueprint::{Capability, CapabilityKind, Channel, ChannelIdentifier, CommonChannel, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelMatrix};
 use mlc_data::fixture::blueprint::entities::{Brightness, FogKind};
-use mlc_data::fixture::blueprint::units::SignedPercentage;
 use mlc_data::project::ToFileName;
-use crate::convert::helpers::{CustomOptionalParser};
-use crate::convert::parse_helpers::{ParseExecutorObj, OER, OML};
+use crate::convert::parse_helpers::{ParseExecutorObj};
 
 mod helpers;
 mod parse_helpers;
 mod units;
 mod entities;
+mod parseable;
 
-pub trait Parseable: Sized {
-    fn parse_from_value(value: &Value) -> ContextResult<Self>;
-    fn parse_from_object(obj: &Map<String, Value>, key: &str) -> ContextResult<Self> {
-        let v = obj.get(key).ok_or(err!("'{}' must be present in object", key))?;
-        Self::parse_from_value(v)
-    }
-
-}
 
 
 pub fn convert(ofl_source: &Value, manufacturer: String) -> ContextResult<FixtureBlueprint> {
@@ -158,10 +149,10 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             effect: obj.parse("shutterEffect")?,
         },
         "StrobeSpeed" => CapabilityKind::StrobeSpeed {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
         },
         "StrobeDuration" => CapabilityKind::StrobeDuration {
-            duration: obj.parse::<OML<_>>("duration").require()?,
+            duration: obj.parse("duration")?,
         },
         "Intensity" => CapabilityKind::Intensity {
           brightness: obj.parse_default("brightness", MaybeLinear::Linear {
@@ -177,23 +168,23 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             color: obj.parse("color")?,
         },
         "ColorPreset" => CapabilityKind::ColorPreset {
-            colors: obj.parse::<OML<_>>("colors").require_default(MaybeLinear::Constant(vec![]))?,
+            colors: obj.parse_default("colors", MaybeLinear::Constant(vec![]))?,
             color_temperature: obj.parse("colorTemperature")?,
         },
         "ColorTemperature" => CapabilityKind::ColorTemperature {
-          temperature: obj.parse::<OML<_>>("colorTemperature").require()?,
+          temperature: obj.parse("colorTemperature")?,
         },
         "Pan" => CapabilityKind::Pan {
-            angle: obj.parse::<OML<_>>("angle").require()?,
+            angle: obj.parse("angle")?,
         },
         "PanContinuous" => CapabilityKind::PanContinuous {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
         },
         "Tilt" => CapabilityKind::Tilt {
-            angle: obj.parse::<OML<_>>("angle").require()?,
+            angle: obj.parse("angle")?,
         },
         "TiltContinuous" => CapabilityKind::TiltContinuous {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
         },
         "PanTiltSpeed" => CapabilityKind::PanTiltSpeed {
             speed: obj.parse("speed")?,
@@ -201,13 +192,13 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
         },
         "WheelSlot" => CapabilityKind::WheelSlot {
             wheel: obj.parse("wheel")?,
-            slot_number: obj.parse::<OML<_>>("slotNumber").require()?,
+            slot_number: obj.parse("slotNumber")?,
         },
         "WheelShake" => CapabilityKind::WheelShake,
         "WheelSlotRotation" => CapabilityKind::WheelSlotRotation,
         "WheelRotation" => CapabilityKind::WheelRotation,
         "Effect" => CapabilityKind::Effect {
-            preset_or_name: obj.parse::<OER<_, _>>("effectPreset effectName").require()?,
+            preset_or_name: obj.parse("effectPreset effectName")?,
             speed: obj.parse("speed")?,
             duration: obj.parse("duration")?,
             parameter: obj.parse("parameter")?,
@@ -215,39 +206,39 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             sound_sensitivity: obj.parse("soundSensitivity")?,
         },
         "EffectSpeed" => CapabilityKind::EffectSpeed {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
         },
         "EffectDuration" => CapabilityKind::EffectDuration {
-            duration: obj.parse::<OML<_>>("duration").require()?,
+            duration: obj.parse("duration")?,
         },
         "EffectParameter" => CapabilityKind::EffectParameter {
-            parameter: obj.parse::<OML<_>>("parameter").require()?,
+            parameter: obj.parse("parameter")?,
         },
         "SoundSensitivity" => CapabilityKind::SoundSensitivity {
-            sensitivity: obj.parse::<OML<_>>("soundSensitivity").require()?,
+            sensitivity: obj.parse("soundSensitivity")?,
         },
         "BeamAngle" => CapabilityKind::BeamAngle {
-            angle: obj.parse::<OML<_>>("angle").require()?,
+            angle: obj.parse("angle")?,
         },
         "BeamPosition" => CapabilityKind::BeamPosition {
             horizontal_angle: obj.parse("horizontalAngle")?,
             vertical_angle: obj.parse("verticalAngle")?,
         },
         "Focus" => CapabilityKind::Focus {
-            distance: obj.parse::<OML<_>>("distance").require()?,
+            distance: obj.parse("distance")?,
         },
         "Zoom" => CapabilityKind::Zoom {
-            angle: obj.parse::<OML<_>>("angle").require()?,
+            angle: obj.parse("angle")?,
         },
         "Iris" => CapabilityKind::Iris {
-            open_percent: obj.parse::<OML<_>>("openPercent").require()?,
+            open_percent: obj.parse("openPercent")?,
         },
         "IrisEffect" => CapabilityKind::IrisEffect {
             name: obj.parse("effectName")?,
             speed: obj.parse("speed")?,
         },
         "Frost" => CapabilityKind::Frost {
-            intensity: obj.parse::<OML<_>>("frostIntensity").require()?,
+            intensity: obj.parse("frostIntensity")?,
         },
         "FrostEffect" => CapabilityKind::FrostEffect {
             name: obj.parse("effectName")?,
@@ -269,7 +260,7 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             output: obj.parse("fogOutput")?,
         },
         "FogOutput" => CapabilityKind::FogOutput {
-            output: obj.parse::<OML<_>>("fogOutput").require()?,
+            output: obj.parse("fogOutput")?,
         },
         "FogType" => CapabilityKind::FogType {
             kind: obj.parse("fogType")?,
@@ -279,10 +270,10 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             angle: obj.parse("angle")?,
         },
         "Speed" => CapabilityKind::Speed {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
         },
         "Time" => CapabilityKind::Time {
-            time: obj.parse::<OML<_>>("time").require()?,
+            time: obj.parse("time")?,
         },
         "Maintenance" => CapabilityKind::Maintenance {
             parameter: obj.parse("parameter")?,

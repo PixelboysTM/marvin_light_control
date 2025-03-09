@@ -3,7 +3,7 @@ use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
 use mlc_data::fixture::blueprint::{entities::{Distance, FogKind, FogOutput, HorizontalAngle}, units::SignedPercentage};
 use mlc_data::fixture::blueprint::entities::{BeamAngle, Brightness, Color, ColorTemperature, DynamicColor, IrisPercent, Parameter, Preset, RotationAngle, RotationSpeed, ShutterEffect, Speed, Time, VerticalAngle};
 use crate::convert::parse_helpers::ParseExecutorValue;
-use crate::convert::Parseable;
+use crate::convert::parseable::{Parseable, SimpleParseable};
 
 fn s_zero() -> SignedPercentage { SignedPercentage::create(0.0) }
 fn s_one() -> SignedPercentage { SignedPercentage::create(0.01) }
@@ -15,7 +15,7 @@ fn zero() -> Percentage { Percentage::create(0.0) }
 fn one() -> Percentage { Percentage::create(0.01) }
 fn hundred() -> Percentage { Percentage::create(1.0) }
 
-impl Parseable for FogOutput {
+impl SimpleParseable for FogOutput {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("FogOutput must be a string"))?;
 
@@ -28,7 +28,7 @@ impl Parseable for FogOutput {
     }
 }
 
-impl Parseable for FogKind {
+impl SimpleParseable for FogKind {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("FogKind must be a string"))?;
         match s {
@@ -39,7 +39,7 @@ impl Parseable for FogKind {
     }
 }
 
-impl Parseable for Distance {
+impl SimpleParseable for Distance {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Distance must be a string"))?;
 
@@ -51,7 +51,7 @@ impl Parseable for Distance {
     }
 }
 
-impl Parseable for HorizontalAngle {
+impl SimpleParseable for HorizontalAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("HorizontalAngle must be a string"))?;
 
@@ -64,7 +64,7 @@ impl Parseable for HorizontalAngle {
     }
 }
 
-impl Parseable for VerticalAngle {
+impl SimpleParseable for VerticalAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("VerticalAngle must be a string"))?;
 
@@ -77,7 +77,7 @@ impl Parseable for VerticalAngle {
     }
 }
 
-impl Parseable for BeamAngle {
+impl SimpleParseable for BeamAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("BeamAngle must be a string"))?;
 
@@ -90,7 +90,7 @@ impl Parseable for BeamAngle {
     }
 }
 
-impl Parseable for Parameter {
+impl SimpleParseable for Parameter {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         if value.is_number() {
             Ok(Parameter::Number(value.as_f64().map(|n| n as f32).expect("Tested that it is a number")))
@@ -113,7 +113,7 @@ impl Parseable for Parameter {
     }
 }
 
-impl Parseable for RotationAngle {
+impl SimpleParseable for RotationAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         if let Ok(deg) = value.parse() { Ok(RotationAngle::Degrees(deg)) }
         else if let Ok(p) = value.parse() { Ok(RotationAngle::Percent(p))}
@@ -121,7 +121,7 @@ impl Parseable for RotationAngle {
     }
 }
 
-impl Parseable for RotationSpeed {
+impl SimpleParseable for RotationSpeed {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("RotationSpeed must be a string"))?;
 
@@ -137,7 +137,7 @@ impl Parseable for RotationSpeed {
     }
 }
 
-impl Parseable for ColorTemperature {
+impl SimpleParseable for ColorTemperature {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("ColorTemperature must be a string"))?;
 
@@ -152,7 +152,7 @@ impl Parseable for ColorTemperature {
     }
 }
 
-impl Parseable for Color {
+impl SimpleParseable for Color {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Color must be a string"))?;
 
@@ -175,7 +175,7 @@ impl Parseable for Color {
     }
 }
 
-impl Parseable for DynamicColor {
+impl SimpleParseable for DynamicColor {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("DynamicColor must be a string"))?;
         if !s.starts_with("#") ||s.len() != 7 { return Err(err!("DynamicColor is not a hex string"));}
@@ -190,7 +190,7 @@ impl Parseable for DynamicColor {
     }
 }
 
-impl Parseable for Brightness {
+impl SimpleParseable for Brightness {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Brightness must be a string"))?;
 
@@ -203,7 +203,7 @@ impl Parseable for Brightness {
     }
 }
 
-impl Parseable for Time {
+impl SimpleParseable for Time {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Time must be a string"))?;
 
@@ -217,7 +217,7 @@ impl Parseable for Time {
     }
 }
 
-impl Parseable for Speed {
+impl SimpleParseable for Speed {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Speed must be a string"))?;
 
@@ -233,7 +233,7 @@ impl Parseable for Speed {
     }
 }
 
-impl Parseable for ShutterEffect {
+impl SimpleParseable for ShutterEffect {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("shutterEffect must be a string"))?;
         match s {
@@ -252,7 +252,7 @@ impl Parseable for ShutterEffect {
     }
 }
 
-impl Parseable for Preset {
+impl SimpleParseable for Preset {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Preset must be a string"))?;
         match s {
@@ -263,7 +263,7 @@ impl Parseable for Preset {
     }
 }
 
-impl Parseable for IrisPercent {
+impl SimpleParseable for IrisPercent {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("IrisPercent must be a string"))?;
 

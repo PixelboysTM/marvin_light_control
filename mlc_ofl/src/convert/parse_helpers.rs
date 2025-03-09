@@ -1,7 +1,7 @@
 use either::Either;
 use serde_json::{Map, Value};
 use mlc_data::{ContextResult, MaybeLinear};
-use crate::convert::Parseable;
+use crate::convert::parseable::Parseable;
 
 pub trait ParseableDefault: Sized {
     fn parse_from_object_default(obj: &Map<String, Value>, key: &str, default: Self) -> ContextResult<Self>;
@@ -44,6 +44,3 @@ impl ParseExecutorValue for Value {
         T::parse_from_value_default(self, default)
     }
 }
-
-pub type OML<T> = Option<MaybeLinear<T>>;
-pub type OER<L, R> = Option<Either<L, R>>;
