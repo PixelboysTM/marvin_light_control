@@ -131,7 +131,7 @@ fn Connect() -> Element {
                                                 "Connecting to backend failed. Please see logs for more information",
                                             )
                                             .post();
-                                        error!("Error occured: {e:?}");
+                                        error!("Error occurred: {e:?}");
                                     }
                                 }
                             } else {

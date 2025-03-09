@@ -330,12 +330,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "breakpoint"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3092732264d05fd9669fbabf625efecb32a84ffda73e237ae584efd0f1e1b7c"
-
-[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3095,10 +3089,8 @@ dependencies = [
 name = "mlc_data"
 version = "0.0.1"
 dependencies = [
- "breakpoint",
  "chrono",
  "either",
- "macro_rules_attribute",
  "serde",
 ]
 

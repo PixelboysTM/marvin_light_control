@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::Percentage;
-use super::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, SignedPercentage, Seconds, VolumePerMin, BPM, RPM};
+use super::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, SignedPercentage, Seconds, VolumePerMin, BPM, RPM, Percentage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FogOutput {

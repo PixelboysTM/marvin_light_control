@@ -3,7 +3,7 @@ use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
 use mlc_data::fixture::blueprint::{entities::{Distance, FogKind, FogOutput, HorizontalAngle}, units::SignedPercentage};
 use mlc_data::fixture::blueprint::entities::{BeamAngle, Brightness, Color, ColorTemperature, DynamicColor, IrisPercent, Parameter, Preset, RotationAngle, RotationSpeed, ShutterEffect, Speed, Time, VerticalAngle};
 use crate::convert::parse_helpers::ParseExecutorValue;
-use crate::convert::parseable::{Parseable, SimpleParseable};
+use crate::convert::parseable::{SimpleParseable};
 
 fn s_zero() -> SignedPercentage { SignedPercentage::create(0.0) }
 fn s_one() -> SignedPercentage { SignedPercentage::create(0.01) }
@@ -141,11 +141,9 @@ impl SimpleParseable for ColorTemperature {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("ColorTemperature must be a string"))?;
 
-        if s == "warm" { Ok(ColorTemperature::Percent(s_neg_hundred()))}
-        else if s == "CTO" { Ok(ColorTemperature::Percent(s_neg_hundred()))}
+        if s == "warm" || s == "CTO" { Ok(ColorTemperature::Percent(s_neg_hundred()))}
         else if s == "default" { Ok(ColorTemperature::Percent(s_zero()))}
-        else if s == "cold" { Ok(ColorTemperature::Percent(s_hundred()))}
-        else if s == "CTB" { Ok(ColorTemperature::Percent(s_hundred()))}
+        else if s == "cold" || s == "CTB" { Ok(ColorTemperature::Percent(s_hundred()))}
         else if let Ok(kelvin) = value.parse() { Ok(ColorTemperature::Kelvin(kelvin))}
         else if let Ok(p) = value.parse() { Ok(ColorTemperature::Percent(p))}
         else { Err(err!("ColorTemperature can't be parsed"))}

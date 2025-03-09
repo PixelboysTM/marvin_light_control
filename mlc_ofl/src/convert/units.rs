@@ -1,7 +1,7 @@
 use serde_json::Value;
 use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
 use mlc_data::fixture::blueprint::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, Seconds, SignedPercentage, VolumePerMin, BPM, RPM};
-use crate::convert::parseable::{Parseable, SimpleParseable};
+use crate::convert::parseable::{SimpleParseable};
 
 impl SimpleParseable for SignedPercentage {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {

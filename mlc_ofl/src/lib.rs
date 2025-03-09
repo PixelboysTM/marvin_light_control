@@ -29,7 +29,7 @@ pub async fn create_lib(path: &Path, pretty: bool) -> Result<(), Box<dyn std::er
 
         #[cfg(debug_assertions)]
         {
-            if format!("{}:{}", manu, name) == "clay-paky:alpha-spot-qwo-800.json" {
+            if format!("{}:{}", manu, name) == "" {
                 log::debug!("Halt");
             }
         }

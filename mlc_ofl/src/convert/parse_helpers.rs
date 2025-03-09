@@ -1,7 +1,6 @@
-use either::Either;
-use serde_json::{Map, Value};
-use mlc_data::{ContextResult, MaybeLinear};
 use crate::convert::parseable::Parseable;
+use mlc_data::ContextResult;
+use serde_json::{Map, Value};
 
 pub trait ParseableDefault: Sized {
     fn parse_from_object_default(obj: &Map<String, Value>, key: &str, default: Self) -> ContextResult<Self>;
