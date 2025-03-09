@@ -6,6 +6,7 @@ use crate::{MaybeLinear, Percentage};
 use entities::*;
 
 pub mod entities;
+pub mod units;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixtureBlueprint {
@@ -154,7 +155,7 @@ pub enum CapabilityKind {
         speed: MaybeLinear<RotationSpeed>,
     },
     PanTiltSpeed {
-        speed: MaybeLinear<Speed>,
+        speed: Option<MaybeLinear<Speed>>,
         duration: Option<MaybeLinear<Time>>
     },
     WheelSlot {
@@ -167,8 +168,6 @@ pub enum CapabilityKind {
     WheelRotation,
     Effect {
         preset_or_name: Either<Preset, String>,
-        // name: String,
-        // preset: String, //TODO: Make Into Actual preset and merge with name
         speed: Option<MaybeLinear<Speed>>,
         duration: Option<MaybeLinear<Time>>,
         parameter: Option<MaybeLinear<Parameter>>,
@@ -201,7 +200,7 @@ pub enum CapabilityKind {
         angle: MaybeLinear<BeamAngle>
     },
     Iris {
-        open_percent: MaybeLinear<Percentage>,
+        open_percent: MaybeLinear<IrisPercent>,
     },
     IrisEffect {
         name: String,

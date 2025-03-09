@@ -10,3 +10,7 @@ macro_rules_attribute.workspace = true
 serde.workspace = true
 chrono = { version = "0.4.40", features = ["serde"] }
 either = { version = "1.15.0" , features = ["serde"]}
+
+
+[dev-dependencies]
+breakpoint = "0.1.0"

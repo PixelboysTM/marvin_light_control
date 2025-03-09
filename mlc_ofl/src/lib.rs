@@ -27,6 +27,13 @@ pub async fn create_lib(path: &Path, pretty: bool) -> Result<(), Box<dyn std::er
         log::info!("Parsing: {}:{}", manu, name);
         let data: String = String::from_utf8( file.bytes().collect::<Result<Vec<u8>, _>>()?)?;
 
+        #[cfg(debug_assertions)]
+        {
+            if format!("{}:{}", manu, name) == "clay-paky:alpha-spot-qwo-800.json" {
+                log::debug!("Halt");
+            }
+        }
+
         let blueprint = convert(&serde_json::from_str(&data)?, manu.to_string()).map_err(ContextError::to_generic)?;
         blueprints.push(blueprint);
     }

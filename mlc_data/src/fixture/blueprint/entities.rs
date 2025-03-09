@@ -1,13 +1,11 @@
 use serde::{Deserialize, Serialize};
 use crate::Percentage;
+use super::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, SignedPercentage, Seconds, VolumePerMin, BPM, RPM};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FogOutput {
-    VolumePerMinute(f32),
+    VolumePerMinute(VolumePerMin),
     Percentage(Percentage),
-    Off,
-    Weak,
-    Strong,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FogKind {
@@ -17,82 +15,51 @@ pub enum FogKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Distance {
-    Meters(f32),
-    Percentage(Percentage),
-    Near,
-    Far,
+    Meters(Meters),
+    Percentage(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HorizontalAngle {
-    Degrees(f32),
-    Percentage(Percentage),
-    Left,
-    Center,
-    Right
+    Degrees(Degree),
+    Percentage(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VerticalAngle {
-    Degrees(f32),
-    Percentage(Percentage),
-    Top,
-    Center,
-    Bottom
+    Degrees(Degree),
+    Percentage(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BeamAngle {
-    Degrees(f32),
+    Degrees(Degree),
     Percentage(Percentage),
-    Closed,
-    Narrow,
-    Wide
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Parameter {
     Number(f32),
-    Percentage(Percentage),
-    Off,
-    Low,
-    High,
-    Slow,
-    Fast,
-    Small,
-    Big,
-    Instant,
-    Short,
-    Long
+    Percentage(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationAngle {
-    Degrees(f32),
-    Percent(Percentage),
+    Degrees(Degree),
+    Percent(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationSpeed {
-    Hertz(f32),
-    RPM(f32),
-    Percent(Percentage),
-    FastCW,
-    SlowCW,
-    Stop,
-    SlowCCW,
-    FastCCW
+    Hz(Hz),
+    RPM(RPM),
+    Percent(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColorTemperature {
-    Kelvin(f32),
-    Percent(Percentage),
-    Warm,
-    CTO,
-    Default,
-    Cold,
-    CTB
+    Kelvin(Kelvin),
+    Percent(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,33 +88,22 @@ pub struct DynamicColor {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Brightness {
-    Lumen(f32),
+    Lumen(Lumen),
     Percent(Percentage),
-    Off,
-    Dark,
-    Bright
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Time {
-    Seconds(f32),
-    Milliseconds(f32),
+    Seconds(Seconds),
+    Milliseconds(MilliSeconds),
     Percent(Percentage),
-    Instant,
-    Short,
-    Long
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Speed {
-    Hertz(f32),
-    Bpm(f32),
-    Percent(Percentage),
-    Fast,
-    Slow,
-    Stop,
-    SlowReverse,
-    FastReverse,
+    Hz(Hz),
+    Bpm(BPM),
+    Percent(SignedPercentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,3 +125,6 @@ pub enum Preset {
     ColorJump,
     ColorFade,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IrisPercent(pub Percentage);

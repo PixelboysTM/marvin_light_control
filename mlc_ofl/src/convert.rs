@@ -4,12 +4,15 @@ use serde_json::{Map, Value};
 use mlc_data::{err, DmxGranularity, ContextResult, GenericDMXValue, MaybeLinear, Percentage, PercentageDmxExt};
 use mlc_data::fixture::blueprint::{Capability, CapabilityKind, Channel, ChannelIdentifier, CommonChannel, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelMatrix};
 use mlc_data::fixture::blueprint::entities::{Brightness, FogKind};
+use mlc_data::fixture::blueprint::units::SignedPercentage;
 use mlc_data::project::ToFileName;
 use crate::convert::helpers::{CustomOptionalParser};
 use crate::convert::parse_helpers::{ParseExecutorObj, OER, OML};
 
 mod helpers;
 mod parse_helpers;
+mod units;
+mod entities;
 
 pub trait Parseable: Sized {
     fn parse_from_value(value: &Value) -> ContextResult<Self>;
@@ -162,20 +165,23 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
         },
         "Intensity" => CapabilityKind::Intensity {
           brightness: obj.parse_default("brightness", MaybeLinear::Linear {
-              start: Brightness::Off,
-              end: Brightness::Bright,
+              start: Brightness::Percent(Percentage::create(0.0)),
+              end: Brightness::Percent(Percentage::create(1.0)),
           })?,
         },
         "ColorIntensity" => CapabilityKind::ColorIntensity {
             brightness: obj.parse_default("brightness", MaybeLinear::Linear {
-                start: Brightness::Off,
-                end: Brightness::Bright,
+                start: Brightness::Percent(Percentage::create(0.0)),
+                end: Brightness::Percent(Percentage::create(1.0)),
             })?,
             color: obj.parse("color")?,
         },
         "ColorPreset" => CapabilityKind::ColorPreset {
-            colors: obj.parse::<OML<_>>("colors").require()?,
+            colors: obj.parse::<OML<_>>("colors").require_default(MaybeLinear::Constant(vec![]))?,
             color_temperature: obj.parse("colorTemperature")?,
+        },
+        "ColorTemperature" => CapabilityKind::ColorTemperature {
+          temperature: obj.parse::<OML<_>>("colorTemperature").require()?,
         },
         "Pan" => CapabilityKind::Pan {
             angle: obj.parse::<OML<_>>("angle").require()?,
@@ -190,7 +196,7 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             speed: obj.parse::<OML<_>>("speed").require()?,
         },
         "PanTiltSpeed" => CapabilityKind::PanTiltSpeed {
-            speed: obj.parse::<OML<_>>("speed").require()?,
+            speed: obj.parse("speed")?,
             duration: obj.parse("duration")?,
         },
         "WheelSlot" => CapabilityKind::WheelSlot {
@@ -215,7 +221,7 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
             duration: obj.parse::<OML<_>>("duration").require()?,
         },
         "EffectParameter" => CapabilityKind::EffectParameter {
-            parameter: obj.parse::<OML<_>>("effectParameter").require()?,
+            parameter: obj.parse::<OML<_>>("parameter").require()?,
         },
         "SoundSensitivity" => CapabilityKind::SoundSensitivity {
             sensitivity: obj.parse::<OML<_>>("soundSensitivity").require()?,
