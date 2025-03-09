@@ -17,7 +17,7 @@ pub type DynamicResult<T> = Result<T, DynamicError>;
 pub type ContextResult<T> = Result<T, ContextError>;
 
 
-pub type Percentage = BoundedValue<f32, Zero, One>;
+pub type SavePercentage = BoundedValue<f32, Zero, One>;
 pub type TrippleDMXValue = BoundedValue<
     u32,
     DynamicU32<{ DmxGranularity::Tripple.min() }>,
@@ -66,9 +66,11 @@ pub trait PercentageDmxExt {
     fn to_single_dmx(&self) -> SingleDMXValue;
     fn to_double_dmx(&self) -> DoubleDMXValue;
     fn to_tripple_dmx(&self) -> TrippleDMXValue;
+
+    fn to_unit(&self) -> fixture::blueprint::units::Percentage;
 }
 
-impl PercentageDmxExt for Percentage {
+impl PercentageDmxExt for SavePercentage {
     fn from_gen_dmx(dmx: GenericDMXValue, granularity: DmxGranularity) -> Self {
         let val = dmx.take() as f32 / granularity.max() as f32;
         Self::create(val)
@@ -103,6 +105,10 @@ impl PercentageDmxExt for Percentage {
 
     fn to_tripple_dmx(&self) -> TrippleDMXValue {
         TrippleDMXValue::create((self.take() * TrippleDMXValue::max() as f32) as u32)
+    }
+
+    fn to_unit(&self) -> fixture::blueprint::units::Percentage {
+        fixture::blueprint::units::Percentage(self.take())
     }
 }
 

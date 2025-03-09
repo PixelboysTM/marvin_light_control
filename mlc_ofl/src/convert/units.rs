@@ -1,32 +1,18 @@
 use serde_json::Value;
-use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
-use mlc_data::fixture::blueprint::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, Seconds, SignedPercentage, VolumePerMin, BPM, RPM};
+use mlc_data::{err, ContextResult, misc::ContextError};
+use mlc_data::fixture::blueprint::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, Percentage, Seconds, VolumePerMin, BPM, RPM};
 use crate::convert::parseable::{SimpleParseable};
 
-impl SimpleParseable for SignedPercentage {
+impl SimpleParseable for Percentage {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("SignedPercentage must be a string"))?;
 
         match s {
-            "off" => Ok(SignedPercentage::create(0.0)),
-            "low" => Ok(SignedPercentage::create(0.01)),
-            "high" => Ok(SignedPercentage::create(1.0)),
-            percentage if percentage.ends_with("%") => {let p =s[..percentage.len() - 1].parse::<f32>().map_err(|e| err!(e))?; Ok(SignedPercentage::create(p / 100.0))}
+            "off" => Ok(Percentage(0.0)),
+            "low" => Ok(Percentage(0.01)),
+            "high" => Ok(Percentage(1.0)),
+            percentage if percentage.ends_with("%") => {let p =s[..percentage.len() - 1].parse::<f32>().map_err(|e| err!(e))?; Ok(Percentage(p / 100.0))}
             _ => Err(err!("SignedPercentage can't be parsed"))
-        }
-    }
-}
-
-impl SimpleParseable for Percentage {
-    fn parse_from_value(value: &Value) -> ContextResult<Self> {
-        let s = value.as_str().ok_or(err!("Percentage must be a string"))?;
-
-        match s {
-            "off" => Ok(Percentage::create(0.0)),
-            "low" => Ok(Percentage::create(0.01)),
-            "high" => Ok(Percentage::create(1.0)),
-            percentage if percentage.ends_with("%") => {let p =s[..percentage.len() - 1].parse::<f32>().map_err(|e| err!(e))?; Ok(Percentage::create(p / 100.0))}
-            _ => Err(err!("Percentage can't be parsed"))
         }
     }
 }

@@ -1,9 +1,10 @@
 use mlc_data::misc::ContextError;
 use std::collections::HashMap;
 use serde_json::{Map, Value};
-use mlc_data::{err, DmxGranularity, ContextResult, GenericDMXValue, MaybeLinear, Percentage, PercentageDmxExt};
+use mlc_data::{err, DmxGranularity, ContextResult, GenericDMXValue, MaybeLinear, PercentageDmxExt, SavePercentage};
 use mlc_data::fixture::blueprint::{Capability, CapabilityKind, Channel, ChannelIdentifier, CommonChannel, FixtureBlueprint, Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelMatrix};
 use mlc_data::fixture::blueprint::entities::{Brightness, FogKind};
+use mlc_data::fixture::blueprint::units::Percentage;
 use mlc_data::project::ToFileName;
 use crate::convert::parse_helpers::{ParseExecutorObj};
 
@@ -78,6 +79,8 @@ fn parse_channel(src: &Value) -> ContextResult<Channel> {
 }
 
 fn parse_common_channel(obj: &Map<String, Value>, granularity: DmxGranularity) -> ContextResult<CommonChannel> {
+
+
     let value_resolution = obj.get("dmxValueResolution").map(|r| r.as_str().ok_or(err!("valueResolution must be a string")).and_then(|s| match s {
         "8bit" => Ok(DmxGranularity::Single),
         "16bit" => Ok(DmxGranularity::Double),
@@ -86,10 +89,10 @@ fn parse_common_channel(obj: &Map<String, Value>, granularity: DmxGranularity) -
     })).unwrap_or(Ok(granularity))?;
 
     let default_value = obj.get("default_value").map(|v| match v {
-        Value::Number(number) => Ok(number.as_u64().ok_or(err!("default_value must be unsigned int")).map(|v| Percentage::from_gen_dmx(GenericDMXValue::create(v as u32), value_resolution))?),
-        Value::String(s) if s.ends_with("%") => Ok(s[..s.len() - 1].parse::<f32>().map(Percentage::create).map_err(|e| err!(e))?),
+        Value::Number(number) => Ok(number.as_u64().ok_or(err!("default_value must be unsigned int")).map(|v| SavePercentage::from_gen_dmx(GenericDMXValue::create(v as u32), value_resolution))?),
+        Value::String(s) if s.ends_with("%") => Ok(s[..s.len() - 1].parse::<f32>().map(SavePercentage::create).map_err(|e| err!(e))?),
         _ => Err(err!("invalid defaultValue")),
-    }).unwrap_or(Ok(Percentage::create(0.0)))?;
+    }).unwrap_or(Ok(SavePercentage::create(0.0)))?;
 
     let caps_decide = (obj.contains_key("capability"), obj.contains_key("capabilities"));
 
@@ -115,9 +118,9 @@ fn parse_capability(src: &Value, is_single: bool, granularity: DmxGranularity) -
     let obj = src.as_object().ok_or(err!("capability must be an object"))?;
 
     let range = if is_single {
-        Percentage::create(0.0)..=Percentage::create(1.0)
+        SavePercentage::create(0.0)..=SavePercentage::create(1.0)
     } else {
-        let range = src.get("dmxRange").and_then(|v| v.as_array().map(|v| v.iter().map(|d| d.as_u64().ok_or(err!("dmxValue in range must be an unsigned int")).map(|d| Percentage::from_gen_dmx(GenericDMXValue::create(d as u32), granularity))).collect::<Result<Vec<_>, _>>())).ok_or(err!("dmxRange must be present"))??;
+        let range = src.get("dmxRange").and_then(|v| v.as_array().map(|v| v.iter().map(|d| d.as_u64().ok_or(err!("dmxValue in range must be an unsigned int")).map(|d| SavePercentage::from_gen_dmx(GenericDMXValue::create(d as u32), granularity))).collect::<Result<Vec<_>, _>>())).ok_or(err!("dmxRange must be present"))??;
         if range.len() != 2 {
             return Err(err!("dmxRange must contain exactly two values"));
         }
@@ -156,14 +159,14 @@ fn parse_capability_kind(obj: &Map<String, Value>) -> ContextResult<CapabilityKi
         },
         "Intensity" => CapabilityKind::Intensity {
           brightness: obj.parse_default("brightness", MaybeLinear::Linear {
-              start: Brightness::Percent(Percentage::create(0.0)),
-              end: Brightness::Percent(Percentage::create(1.0)),
+              start: Brightness::Percent(Percentage(0.0)),
+              end: Brightness::Percent(Percentage(1.0)),
           })?,
         },
         "ColorIntensity" => CapabilityKind::ColorIntensity {
             brightness: obj.parse_default("brightness", MaybeLinear::Linear {
-                start: Brightness::Percent(Percentage::create(0.0)),
-                end: Brightness::Percent(Percentage::create(1.0)),
+                start: Brightness::Percent(Percentage(0.0)),
+                end: Brightness::Percent(Percentage(1.0)),
             })?,
             color: obj.parse("color")?,
         },

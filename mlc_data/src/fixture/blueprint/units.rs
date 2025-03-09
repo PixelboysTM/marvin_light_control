@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use crate::bounded::BoundedValue;
-use crate::bounded::bounds::{NegOne, One};
 
-pub type SignedPercentage = BoundedValue<f32, NegOne, One>;
-pub use crate::Percentage; // TODO: Merge into just an f32
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Percentage(pub f32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]

@@ -1,19 +1,16 @@
 use serde_json::Value;
-use mlc_data::{err, ContextResult, misc::ContextError, Percentage};
-use mlc_data::fixture::blueprint::{entities::{Distance, FogKind, FogOutput, HorizontalAngle}, units::SignedPercentage};
+use mlc_data::{err, ContextResult, misc::ContextError};
+use mlc_data::fixture::blueprint::{entities::{Distance, FogKind, FogOutput, HorizontalAngle}};
 use mlc_data::fixture::blueprint::entities::{BeamAngle, Brightness, Color, ColorTemperature, DynamicColor, IrisPercent, Parameter, Preset, RotationAngle, RotationSpeed, ShutterEffect, Speed, Time, VerticalAngle};
+use mlc_data::fixture::blueprint::units::Percentage;
 use crate::convert::parse_helpers::ParseExecutorValue;
 use crate::convert::parseable::{SimpleParseable};
 
-fn s_zero() -> SignedPercentage { SignedPercentage::create(0.0) }
-fn s_one() -> SignedPercentage { SignedPercentage::create(0.01) }
-fn s_hundred() -> SignedPercentage { SignedPercentage::create(1.0) }
-fn s_neg_one() -> SignedPercentage { SignedPercentage::create(-0.01) }
-fn s_neg_hundred() -> SignedPercentage { SignedPercentage::create(-1.0) }
-
-fn zero() -> Percentage { Percentage::create(0.0) }
-fn one() -> Percentage { Percentage::create(0.01) }
-fn hundred() -> Percentage { Percentage::create(1.0) }
+fn zero() -> Percentage { Percentage(0.0) }
+fn one() -> Percentage { Percentage(0.01) }
+fn hundred() -> Percentage { Percentage(1.0) }
+fn neg_one() -> Percentage { Percentage(-0.01) }
+fn neg_hundred() -> Percentage { Percentage(-1.0) }
 
 impl SimpleParseable for FogOutput {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
@@ -43,8 +40,8 @@ impl SimpleParseable for Distance {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Distance must be a string"))?;
 
-        if s == "near" { Ok(Distance::Percentage(s_one())) }
-        else if s == "far" { Ok(Distance::Percentage(s_hundred())) }
+        if s == "near" { Ok(Distance::Percentage(one())) }
+        else if s == "far" { Ok(Distance::Percentage(hundred())) }
         else if let Ok(m) = value.parse() { Ok(Distance::Meters(m)) }
         else if let Ok(p) = value.parse() { Ok(Distance::Percentage(p)) }
         else { Err(err!("Distance can't be parsed"))}
@@ -55,9 +52,9 @@ impl SimpleParseable for HorizontalAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("HorizontalAngle must be a string"))?;
 
-        if s == "left" { Ok(HorizontalAngle::Percentage(s_neg_hundred()))}
-        else if s == "right" { Ok(HorizontalAngle::Percentage(s_hundred()))}
-        else if s == "center" { Ok(HorizontalAngle::Percentage(s_zero()))}
+        if s == "left" { Ok(HorizontalAngle::Percentage(neg_hundred()))}
+        else if s == "right" { Ok(HorizontalAngle::Percentage(hundred()))}
+        else if s == "center" { Ok(HorizontalAngle::Percentage(zero()))}
         else if let Ok(deg) = value.parse() { Ok(HorizontalAngle::Degrees(deg))}
         else if let Ok(p) = value.parse() { Ok(HorizontalAngle::Percentage(p))}
         else { Err(err!("HorizontalAngle can't be parsed"))}
@@ -68,9 +65,9 @@ impl SimpleParseable for VerticalAngle {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("VerticalAngle must be a string"))?;
 
-        if s == "top" { Ok(VerticalAngle::Percentage(s_neg_hundred()))}
-        else if s == "bottom" { Ok(VerticalAngle::Percentage(s_hundred()))}
-        else if s == "center" { Ok(VerticalAngle::Percentage(s_zero()))}
+        if s == "top" { Ok(VerticalAngle::Percentage(neg_hundred()))}
+        else if s == "bottom" { Ok(VerticalAngle::Percentage(hundred()))}
+        else if s == "center" { Ok(VerticalAngle::Percentage(zero()))}
         else if let Ok(deg) = value.parse() { Ok(VerticalAngle::Degrees(deg))}
         else if let Ok(p) = value.parse() { Ok(VerticalAngle::Percentage(p))}
         else { Err(err!("VerticalAngle can't be parsed"))}
@@ -97,16 +94,16 @@ impl SimpleParseable for Parameter {
         } else {
             let s = value.as_str().ok_or(err!("Parameter must be a string if it is not a number"))?;
 
-            if s == "off" { Ok(Parameter::Percentage(s_zero()))}
-            else if s == "low" { Ok(Parameter::Percentage(s_one()))}
-            else if s == "high" { Ok(Parameter::Percentage(s_hundred()))}
-            else if s == "slow" { Ok(Parameter::Percentage(s_one()))}
-            else if s == "fast" { Ok(Parameter::Percentage(s_hundred()))}
-            else if s == "small" { Ok(Parameter::Percentage(s_one()))}
-            else if s == "big" { Ok(Parameter::Percentage(s_hundred()))}
-            else if s == "instant" { Ok(Parameter::Percentage(s_zero()))}
-            else if s == "short" { Ok(Parameter::Percentage(s_one()))}
-            else if s == "long" { Ok(Parameter::Percentage(s_hundred()))}
+            if s == "off" { Ok(Parameter::Percentage(zero()))}
+            else if s == "low" { Ok(Parameter::Percentage(one()))}
+            else if s == "high" { Ok(Parameter::Percentage(hundred()))}
+            else if s == "slow" { Ok(Parameter::Percentage(one()))}
+            else if s == "fast" { Ok(Parameter::Percentage(hundred()))}
+            else if s == "small" { Ok(Parameter::Percentage(one()))}
+            else if s == "big" { Ok(Parameter::Percentage(hundred()))}
+            else if s == "instant" { Ok(Parameter::Percentage(zero()))}
+            else if s == "short" { Ok(Parameter::Percentage(one()))}
+            else if s == "long" { Ok(Parameter::Percentage(hundred()))}
             else if let Ok(p) = value.parse(){ Ok(Parameter::Percentage(p))}
             else { Err(err!("Parameter can't be parsed: {}", value))}
         }
@@ -125,11 +122,11 @@ impl SimpleParseable for RotationSpeed {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("RotationSpeed must be a string"))?;
 
-        if s == "fast CW" { Ok(RotationSpeed::Percent(s_hundred()))  }
-        else if s == "slow CW" { Ok(RotationSpeed::Percent(s_one()))  }
-        else if s == "stop" { Ok(RotationSpeed::Percent(s_zero()))  }
-        else if s == "slow CCW" { Ok(RotationSpeed::Percent(s_neg_one()))  }
-        else if s == "fast CCW" { Ok(RotationSpeed::Percent(s_neg_hundred()))  }
+        if s == "fast CW" { Ok(RotationSpeed::Percent(hundred()))  }
+        else if s == "slow CW" { Ok(RotationSpeed::Percent(one()))  }
+        else if s == "stop" { Ok(RotationSpeed::Percent(zero()))  }
+        else if s == "slow CCW" { Ok(RotationSpeed::Percent(neg_one()))  }
+        else if s == "fast CCW" { Ok(RotationSpeed::Percent(neg_hundred()))  }
         else if let Ok(hertz) = value.parse() { Ok(RotationSpeed::Hz(hertz))  }
         else if let Ok(rpm) = value.parse() { Ok(RotationSpeed::RPM(rpm))  }
         else if let Ok(p) = value.parse() { Ok(RotationSpeed::Percent(p))  }
@@ -141,9 +138,9 @@ impl SimpleParseable for ColorTemperature {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("ColorTemperature must be a string"))?;
 
-        if s == "warm" || s == "CTO" { Ok(ColorTemperature::Percent(s_neg_hundred()))}
-        else if s == "default" { Ok(ColorTemperature::Percent(s_zero()))}
-        else if s == "cold" || s == "CTB" { Ok(ColorTemperature::Percent(s_hundred()))}
+        if s == "warm" || s == "CTO" { Ok(ColorTemperature::Percent(neg_hundred()))}
+        else if s == "default" { Ok(ColorTemperature::Percent(zero()))}
+        else if s == "cold" || s == "CTB" { Ok(ColorTemperature::Percent(hundred()))}
         else if let Ok(kelvin) = value.parse() { Ok(ColorTemperature::Kelvin(kelvin))}
         else if let Ok(p) = value.parse() { Ok(ColorTemperature::Percent(p))}
         else { Err(err!("ColorTemperature can't be parsed"))}
@@ -219,11 +216,11 @@ impl SimpleParseable for Speed {
     fn parse_from_value(value: &Value) -> ContextResult<Self> {
         let s = value.as_str().ok_or(err!("Speed must be a string"))?;
 
-        if s == "fast" { Ok(Speed::Percent(s_hundred())) }
-        else if s == "slow" { Ok(Speed::Percent(s_one()))}
-        else if s == "stop" { Ok(Speed::Percent(s_zero()))}
-        else if s == "slow reverse" { Ok(Speed::Percent(s_neg_one()))}
-        else if s == "fast reverse" { Ok(Speed::Percent(s_neg_hundred()))}
+        if s == "fast" { Ok(Speed::Percent(hundred())) }
+        else if s == "slow" { Ok(Speed::Percent(one()))}
+        else if s == "stop" { Ok(Speed::Percent(zero()))}
+        else if s == "slow reverse" { Ok(Speed::Percent(neg_one()))}
+        else if s == "fast reverse" { Ok(Speed::Percent(neg_hundred()))}
         else if let Ok(hertz) = value.parse() { Ok(Speed::Hz(hertz))}
         else if let Ok(bpm) = value.parse() { Ok(Speed::Bpm(bpm))}
         else if let Ok(p) = value.parse() { Ok(Speed::Percent(p))}

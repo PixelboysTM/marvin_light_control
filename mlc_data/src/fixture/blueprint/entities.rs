@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use super::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, SignedPercentage, Seconds, VolumePerMin, BPM, RPM, Percentage};
+use super::units::{Degree, Hz, Kelvin, Lumen, Meters, MilliSeconds, Seconds, VolumePerMin, BPM, RPM, Percentage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FogOutput {
@@ -15,19 +15,19 @@ pub enum FogKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Distance {
     Meters(Meters),
-    Percentage(SignedPercentage),
+    Percentage(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HorizontalAngle {
     Degrees(Degree),
-    Percentage(SignedPercentage),
+    Percentage(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VerticalAngle {
     Degrees(Degree),
-    Percentage(SignedPercentage),
+    Percentage(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,26 +39,26 @@ pub enum BeamAngle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Parameter {
     Number(f32),
-    Percentage(SignedPercentage),
+    Percentage(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationAngle {
     Degrees(Degree),
-    Percent(SignedPercentage),
+    Percent(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RotationSpeed {
     Hz(Hz),
     RPM(RPM),
-    Percent(SignedPercentage),
+    Percent(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColorTemperature {
     Kelvin(Kelvin),
-    Percent(SignedPercentage),
+    Percent(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,7 +102,7 @@ pub enum Time {
 pub enum Speed {
     Hz(Hz),
     Bpm(BPM),
-    Percent(SignedPercentage),
+    Percent(Percentage),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

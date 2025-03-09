@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use either::Either;
 use serde::{Deserialize, Serialize};
-use crate::{MaybeLinear, Percentage};
+use crate::{MaybeLinear, SavePercentage};
 use entities::*;
+use crate::fixture::blueprint::units::Percentage;
 
 pub mod entities;
 pub mod units;
@@ -93,17 +94,17 @@ pub enum Channel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommonChannel {
     #[serde(default = "default_percentage")]
-    pub default_value: Percentage,
+    pub default_value: SavePercentage,
     pub capabilities: Vec<Capability>
 }
 
-fn default_percentage() -> Percentage {
-    Percentage::create(0.0)
+fn default_percentage() -> SavePercentage {
+    SavePercentage::create(0.0)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Capability {
-    pub range: RangeInclusive<Percentage>,
+    pub range: RangeInclusive<SavePercentage>,
     #[serde(default)]
     pub pixel: PixelIdentifier,
     pub comment: Option<String>,
