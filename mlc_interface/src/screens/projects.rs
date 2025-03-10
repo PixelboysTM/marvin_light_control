@@ -3,8 +3,9 @@ use dioxus::logger::tracing::info;
 use dioxus::prelude::*;
 use dioxus_free_icons::Icon;
 use dioxus_free_icons::icons::ld_icons::{LdFileArchive, LdFileJson, LdPen, LdPlus, LdTrash};
-use mlc_communication::general_service::{GeneralService, GeneralServiceIdent, View as GenView};
-use mlc_data::project::{ProjectInformation, ProjectType, ToFileName};
+use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, View as GenView};
+use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
+use uuid::Uuid;
 use crate::connect::connect;
 use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
 
@@ -109,14 +110,15 @@ pub fn Project() -> Element {
     }
 }
 
-fn gen_projects(i: usize) -> Vec<ProjectInformation> {
+fn gen_projects(i: usize) -> Vec<ProjectMetadata> {
     (0..i).map(|i| {
         let name = format!("Project {}", i);
-        ProjectInformation {
+        ProjectMetadata {
             name: name.clone(),
             file_name: name.to_project_file_name(),
             project_type: if i % 2 == 0 {ProjectType::Binary} else { ProjectType::Json },
-            last_saved: Local::now()
+            last_saved: Local::now(),
+            id: Uuid::nil(),
         }
     }).collect()
 }

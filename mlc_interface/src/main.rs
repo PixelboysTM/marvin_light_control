@@ -2,7 +2,7 @@ use connect::connect_url;
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
-use mlc_communication::general_service::{GeneralService, GeneralServiceIdent};
+use mlc_communication::services::general::{GeneralService, GeneralServiceIdent};
 use std::net::Ipv4Addr;
 use std::string::ToString;
 use toaster::{ToastInfo, ToasterProvider};

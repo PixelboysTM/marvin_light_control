@@ -6,6 +6,8 @@ use bounded::{
 };
 use crate::misc::ContextError;
 
+pub use uuid;
+
 
 pub mod bounded;
 pub mod fixture;

@@ -3092,6 +3092,7 @@ dependencies = [
  "chrono",
  "either",
  "serde",
+ "uuid",
 ]
 
 [[package]]
@@ -3108,6 +3109,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

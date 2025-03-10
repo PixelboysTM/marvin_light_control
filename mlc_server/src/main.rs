@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use fern::colors::{Color, ColoredLevelConfig};
 use mlc_communication as com;
-use mlc_communication::general_service::{Alive, View};
+use mlc_communication::services::general::{Alive, View};
 use mlc_communication::remoc::prelude::*;
-use mlc_communication::{AnotherService, EchoService};
 use project::Project;
 use server::setup_server;
 use tokio::sync::RwLock;
+use mlc_communication::remoc::rch::watch;
+use mlc_communication::remoc::rch::watch::{Receiver, Sender};
+use mlc_communication::remoc::rtc::CallError;
+use mlc_communication::services::general::Info;
 
 mod project;
 mod server;
@@ -15,26 +18,12 @@ mod tui;
 pub struct ServiceImpl {
     project: Arc<RwLock<Project>>,
     valid_project: Arc<RwLock<bool>>,
+    info_subscribers: Arc<RwLock<Vec<Sender<Info>>>>,
+    status_subscribers: Arc<RwLock<Vec<Sender<String>>>>,
 }
 
 #[rtc::async_trait]
-impl EchoService for ServiceImpl {
-    async fn echo(&self, ping: String) -> Result<String, rtc::CallError> {
-        log::info!("Got ping: {}", ping);
-        Ok(ping)
-    }
-}
-
-#[rtc::async_trait]
-impl AnotherService for ServiceImpl {
-    async fn hello(&self) -> Result<(), rtc::CallError> {
-        log::debug!("Frontend says hello");
-        Ok(())
-    }
-}
-
-#[rtc::async_trait]
-impl com::general_service::GeneralService for ServiceImpl {
+impl com::services::general::GeneralService for ServiceImpl {
     async fn alive(&self) -> Result<Alive, rtc::CallError> {
         Ok(Alive)
     }
@@ -43,6 +32,22 @@ impl com::general_service::GeneralService for ServiceImpl {
             View::Project => !*self.valid_project.read().await,
             View::Edit => *self.valid_project.read().await,
         })
+    }
+
+    async fn info(&self) -> Result<Receiver<Info>, CallError> {
+        let (tx, rx) = watch::channel(Info::Idle);
+
+        self.info_subscribers.write().await.push(tx);
+
+        Ok(rx)
+    }
+
+    async fn status(&self) -> Result<Receiver<String>, CallError> {
+        let (tx, rx) = watch::channel(String::new());
+
+        self.status_subscribers.write().await.push(tx);
+
+        Ok(rx)
     }
 }
 
@@ -55,6 +60,8 @@ async fn main() {
     let service_obj = Arc::new(RwLock::new(ServiceImpl {
         project,
         valid_project: Arc::new(RwLock::new(false)),
+        info_subscribers: Arc::new(RwLock::new(Vec::new())),
+        status_subscribers: Arc::new(RwLock::new(Vec::new())),
     }));
 
     let server_handle = tokio::spawn(setup_server(8181, service_obj));

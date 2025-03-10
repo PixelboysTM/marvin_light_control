@@ -3,10 +3,9 @@ use std::sync::Arc;
 
 use mlc_communication::remoc::rtc::ServerBase;
 use mlc_communication::remoc::{self, prelude::*};
-use mlc_communication::{self as com, general_service};
 use mlc_communication::{
-    AnotherServiceIdent, AnotherServiceServerSharedMut, EchoServiceIdent,
-    EchoServiceServerSharedMut, ServiceIdentifiable,
+    services::*,
+    ServiceIdentifiable,
 };
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
@@ -41,28 +40,18 @@ pub async fn setup_server(port: u16, service_obj: Arc<RwLock<ServiceImpl>>) {
         let service_obj = service_obj.clone();
         tokio::spawn(async move {
             match buffer {
-                EchoServiceIdent::IDENT => {
-                    create::<_, EchoServiceServerSharedMut<_>>(
+                project_selection::ProjectSelectionServiceIdent::IDENT => {
+                    create::<_, project_selection::ProjectSelectionServiceServerSharedMut<_>>(
                         service_obj,
                         socket_rx,
                         socket_tx,
                         ident,
                     )
-                    .await
-                    .unwrap();
+                        .await
+                        .unwrap();
                 }
-                AnotherServiceIdent::IDENT => {
-                    create::<_, AnotherServiceServerSharedMut<_>>(
-                        service_obj,
-                        socket_rx,
-                        socket_tx,
-                        ident,
-                    )
-                    .await
-                    .unwrap();
-                }
-                general_service::GeneralServiceIdent::IDENT => {
-                    create::<_, general_service::GeneralServiceServerSharedMut<_>>(
+                general::GeneralServiceIdent::IDENT => {
+                    create::<_, general::GeneralServiceServerSharedMut<_>>(
                         service_obj,
                         socket_rx,
                         socket_tx,

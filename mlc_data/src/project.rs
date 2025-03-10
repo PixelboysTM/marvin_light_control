@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local};
+use uuid::Uuid;
 
 #[derive(PartialEq, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub enum ProjectType {
@@ -63,8 +64,9 @@ impl ToFileName for String {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ProjectInformation {
+pub struct ProjectMetadata {
     pub name: String,
+    pub id: Uuid,
     pub last_saved: DateTime<Local>,
     #[serde(skip)]
     pub file_name: String,
