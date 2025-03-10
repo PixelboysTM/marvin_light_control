@@ -68,6 +68,46 @@ input {
         border-bottom: 2px solid var(--c-p);
         outline: none;
     }
+
+    &[type="checkbox"] {
+        width: calc(1.25em * 1.8);
+        height: 1.25em;
+        appearance: none;
+        display: inline-grid;
+        align-items: center;
+        justify-items: end;
+        grid-template-columns: 1fr 1fr;
+        border: 2px solid var(--c-bg);
+        border-radius: var(--br);
+        transform: translateY(0.1em);
+        font: inherit;
+        margin: 0;
+        padding: 0;
+        transition: 120ms;
+        cursor: pointer;
+
+        &:checked {
+            border-color: var(--c-p);
+            grid-template-columns: 1fr 0fr;
+        }
+
+        &::before {
+            content: "";
+            width: 0.75em;
+            height: 0.75em;
+            margin: 0 0.1em;
+            padding: 0;
+            transform: scale(1);
+            transition: 120ms background-color ease-in-out;
+            /*box-shadow: inset 1em 1em var(--c-p); */
+            background-color: var(--c-bg);
+
+        }
+
+        &:checked::before {
+            background-color: var(--c-p);
+        }
+    }
 }
 
 button {

@@ -32,11 +32,12 @@ pub fn Branding() -> Element {
 #[component]
 pub fn IconButton<I: IconShape + Clone + PartialEq + 'static>(
     icon: I,
+    class: Option<String>,
     onclick: Option<EventHandler<Event<MouseData>>>,
 ) -> Element {
     rsx! {
         button {
-            class: "iconBtn",
+            class: format!("iconBtn {}", if let Some(c) = class {c} else { "".to_string() }),
             onclick: move |v| {
                 if let Some(c) = onclick {
                     c.call(v);

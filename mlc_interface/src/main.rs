@@ -1,19 +1,19 @@
-use crate::connect::connect;
 use connect::connect_url;
 use dioxus::desktop::{LogicalSize, WindowBuilder};
-use dioxus::logger::tracing::info;
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
-use dioxus_free_icons::icons::ld_icons::LdPlus;
-use mlc_communication::general_service::{GeneralService, GeneralServiceIdent, View as GenView};
-use mlc_data::project::{ProjectType, ToFileName};
+use mlc_communication::general_service::{GeneralService, GeneralServiceIdent};
 use std::net::Ipv4Addr;
 use std::string::ToString;
 use toaster::{ToastInfo, ToasterProvider};
-use utils::{Branding, IconButton, Loader, Modal, Symbol};
+use utils::{Loader};
+use screens::projects::Project;
+
 mod connect;
 mod toaster;
 mod utils;
+
+mod screens;
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -82,6 +82,44 @@ fn Connect() -> Element {
     let mut connect_addr = use_signal(|| ("127.0.0.1".to_string(), "8181".to_string()));
     let mut loading = use_signal(|| false);
 
+    let connect_handler = move || async move {
+        *loading.write() = true;
+        let c = connect_addr.read();
+        if let (Ok(addr), Ok(port)) = (c.0.parse::<Ipv4Addr>(), c.1.parse::<u16>()) {
+            match connect_url::<GeneralServiceIdent>((addr, port)).await {
+                Ok(client) => {
+                    if let Ok(_) = client.alive().await {
+                        *CONNECT_URL.write() = (addr, port);
+                        ToastInfo::info(
+                            "Connection successful",
+                            "Connection to the backend could be established.",
+                        )
+                            .post();
+                        let nav = navigator();
+                        nav.replace("/projects");
+                    }
+                }
+                Err(e) => {
+                    ToastInfo::error(
+                        "Connection error",
+                        "Connecting to backend failed. Please see logs for more information",
+                    )
+                        .post();
+                    error!("Error occurred: {e:?}");
+                }
+            }
+        } else {
+            ToastInfo::error(
+                "Invalid Address",
+                "Not a valid input address provided. Could not try to connect",
+            )
+                .post();
+        }
+        *loading.write() = false;
+    };
+
+    use_future(connect_handler);
+
     rsx! {
         match loading() {
             false => rsx! {
@@ -108,41 +146,7 @@ fn Connect() -> Element {
                         },
                     }
                     button {
-                        onclick: move |_| async move {
-                            *loading.write() = true;
-                            let c = connect_addr.read();
-                            if let (Ok(addr), Ok(port)) = (c.0.parse::<Ipv4Addr>(), c.1.parse::<u16>()) {
-                                match connect_url::<GeneralServiceIdent>((addr, port).clone()).await {
-                                    Ok(client) => {
-                                        if let Ok(_) = client.alive().await {
-                                            *CONNECT_URL.write() = (addr, port);
-                                            ToastInfo::info(
-                                                    "Connection successful",
-                                                    "Connection to the backend could be established.",
-                                                )
-                                                .post();
-                                            let nav = navigator();
-                                            nav.replace("/projects");
-                                        }
-                                    }
-                                    Err(e) => {
-                                        ToastInfo::error(
-                                                "Connection error",
-                                                "Connecting to backend failed. Please see logs for more information",
-                                            )
-                                            .post();
-                                        error!("Error occurred: {e:?}");
-                                    }
-                                }
-                            } else {
-                                ToastInfo::error(
-                                        "Invalid Address",
-                                        "Not a valid input address provided. Could not try to connect",
-                                    )
-                                    .post();
-                            }
-                            *loading.write() = false;
-                        },
+                        onclick: move |_| connect_handler(),
                         "Connect"
                     }
                 }
@@ -154,88 +158,7 @@ fn Connect() -> Element {
     }
 }
 
-const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
-const CREATE_PROJECT: Symbol = Symbol::create("create-project");
-#[component]
-fn Project() -> Element {
-    let _client = use_resource(async || {
-        let res = connect::<GeneralServiceIdent>().await;
-        if res.is_err() {
-            navigator().replace("/");
-        }
-
-        let c = res.expect("Must be");
-        if let Ok(false) = c.is_valid_view(GenView::Project).await {
-            navigator().replace("/project/configure");
-        }
-        c
-    })
-    .suspend()?;
-
-    let mut new_project_name = use_signal(|| "New Project".to_string());
-    let mut new_project_type = use_signal(|| ProjectType::Json);
-    let is_json = use_memo(move || new_project_type.read().eq(&ProjectType::Json));
-
-    let file_name = use_memo(move || {
-        format!(
-            "Will be saved as: {}.{}",
-            new_project_name.read().to_project_file_name(),
-            new_project_type.read().extension()
-        )
-    });
-
-    rsx! {
-        document::Stylesheet { href: PROJECTS_CSS }
-        div { class: "projectsPage",
-            nav {
-                Branding {}
-                h1 { "Project Explorer" }
-                div { class: "actions",
-                    IconButton {
-                        icon: LdPlus,
-                        onclick: async |_| {
-                            info!("Opening");
-                            CREATE_PROJECT.open().await;
-                        },
-                    }
-                }
-            }
-
-            Modal {
-                title: "Create Project",
-                ident: CREATE_PROJECT.clone(),
-                icon: LdPlus,
-                variant: utils::ModalVariant::OkCancel,
-                onexit: move |_| {},
-                oktext: "Create".to_string(),
-                label {
-                    "Project Name: "
-                    input {
-                        r#type: "text",
-                        value: new_project_name().clone(),
-                        oninput: move |v| *new_project_name.write() = v.value(),
-                    }
-                }
-                p { {file_name()} }
-                label {
-                    "Binary: "
-                    input {
-                        r#type: "checkbox",
-                        value: !is_json(),
-                        onchange: move |v| {
-                            *new_project_type.write() = if v.value() == "true" {
-                                ProjectType::Binary
-                            } else {
-                                ProjectType::Json
-                            };
-                        },
-                    }
-                }
-            }
-        }
-    }
-}
 
 #[component]
 fn Configure() -> Element {
