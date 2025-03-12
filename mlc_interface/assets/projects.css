@@ -106,7 +106,7 @@
                 }
             }
 
-            .info{
+            .info {
                 position: relative;
             }
 
@@ -139,11 +139,23 @@
                 color: var(--c-disabled);
             }
 
-            .lastSaved {
-                margin: 0;
-                padding: 0;
+            .details {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 0.25rem;
+
+                p {
+                    margin: 0;
+                    padding: 0;
+
+                    svg {
+                        width: 0.9em;
+                        height: 0.9em;
+                        margin-right: var(--space);
+                        transform: translateY(0.1em);
+                    }
+                }
             }
         }
     }
 }
-

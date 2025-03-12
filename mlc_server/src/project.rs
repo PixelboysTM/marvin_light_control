@@ -38,9 +38,10 @@ impl Project {
             project_information: ProjectMetadata {
                 name: "Default invalid project".into(),
                 last_saved: chrono::Local::now(),
+                created_at: chrono::Local::now(),
                 file_name: "".into(),
                 project_type: ProjectType::default(),
-                id: uuid::Uuid::new_v4(),
+                id: Uuid::new_v4(),
             },
             fixture_blueprints: vec![],
         }

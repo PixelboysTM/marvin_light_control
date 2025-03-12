@@ -68,6 +68,7 @@ pub struct ProjectMetadata {
     pub name: String,
     pub id: Uuid,
     pub last_saved: DateTime<Local>,
+    pub created_at: DateTime<Local>,
     #[serde(skip)]
     pub file_name: String,
     #[serde(skip)]

@@ -1,13 +1,15 @@
-use chrono::Local;
+use crate::connect::connect;
+use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
+use chrono::{Days, Local};
 use dioxus::logger::tracing::info;
 use dioxus::prelude::*;
+use dioxus_free_icons::icons::ld_icons::{
+    LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash,
+};
 use dioxus_free_icons::Icon;
-use dioxus_free_icons::icons::ld_icons::{LdFileArchive, LdFileJson, LdPen, LdPlus, LdTrash};
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, View as GenView};
 use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
 use uuid::Uuid;
-use crate::connect::connect;
-use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
 
 const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
@@ -26,7 +28,7 @@ pub fn Project() -> Element {
         }
         c
     })
-        .suspend()?;
+    .suspend()?;
 
     let mut new_project_name = use_signal(|| "New Project".to_string());
     let mut new_project_type = use_signal(|| ProjectType::Json);
@@ -59,8 +61,8 @@ pub fn Project() -> Element {
 
             SuspenseBoundary {
                 fallback: move |_| {
-                    rsx!{
-                        Loader{}
+                    rsx! {
+                        Loader {}
                     }
                 },
                 ProjectList {}
@@ -81,15 +83,9 @@ pub fn Project() -> Element {
                         oninput: move |v| *new_project_name.write() = v.value(),
                     }
                 }
-                p {
-                    class: "fileName",
-                    span {
-                        "File Name: "
-                    }
-                    span {
-                        class: "value",
-                        {file_name()}
-                    }
+                p { class: "fileName",
+                    span { "File Name: " }
+                    span { class: "value", {file_name()} }
                 }
                 label {
                     "Binary: "
@@ -111,28 +107,35 @@ pub fn Project() -> Element {
 }
 
 fn gen_projects(i: usize) -> Vec<ProjectMetadata> {
-    (0..i).map(|i| {
-        let name = format!("Project {}", i);
-        ProjectMetadata {
-            name: name.clone(),
-            file_name: name.to_project_file_name(),
-            project_type: if i % 2 == 0 {ProjectType::Binary} else { ProjectType::Json },
-            last_saved: Local::now(),
-            id: Uuid::nil(),
-        }
-    }).collect()
+    (0..i)
+        .map(|i| {
+            let name = format!("Project {}", i);
+            ProjectMetadata {
+                name: name.clone(),
+                file_name: name.to_project_file_name(),
+                project_type: if i % 2 == 0 {
+                    ProjectType::Binary
+                } else {
+                    ProjectType::Json
+                },
+                last_saved: Local::now(),
+                created_at: Local::now().checked_sub_days(Days::new(42)).unwrap(),
+                id: Uuid::nil(),
+            }
+        })
+        .collect()
 }
 
 #[component]
 fn ProjectList() -> Element {
-    let projects = use_resource(async ||{
+    let projects = use_resource(async || {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         gen_projects(30)
-    }).suspend()?;
+    })
+    .suspend()?;
 
-    rsx!{
-        div {
-            class: "projectList",
+    rsx! {
+        div { class: "projectList",
             for p in projects().iter() {
                 div {
                     class: "project",
@@ -140,26 +143,36 @@ fn ProjectList() -> Element {
                         info!("Double clicked");
                     },
 
-                    div {
-                        class: "info",
+                    div { class: "info",
                         h1 { {p.name.clone()} }
-                        p {
-                            class: "fileName",
-                            {p.file_name.clone()}
-                        }
-                        p {
-                            class: "lastSaved",
-                            {p.last_saved.format("%d.%m.%y %H:%M").to_string()}
+                        p { class: "fileName", {p.file_name.clone()} }
+
+                        div { class: "details",
+                            p { class: "createdAt",
+                                Icon { icon: LdPencilRuler }
+                                {p.created_at.format("%d.%m.%y %H:%M").to_string()}
+                            }
+                            p { class: "lastSaved",
+                                Icon { icon: LdSave }
+                                {p.last_saved.format("%d.%m.%y %H:%M").to_string()}
+                            }
+                            p { class: "fixtureCount",
+                                Icon { icon: LdLightbulb }
+                                "Fixtures"
+                            }
                         }
 
                         match p.project_type {
-                            ProjectType::Json => rsx!{Icon{icon: LdFileJson, class: "fileType"}},
-                            ProjectType::Binary => rsx!{Icon{icon: LdFileArchive, class: "fileType"}},
+                            ProjectType::Json => rsx! {
+                                Icon { icon: LdFileJson, class: "fileType" }
+                            },
+                            ProjectType::Binary => rsx! {
+                                Icon { icon: LdFileArchive, class: "fileType" }
+                            },
                         }
                     }
 
-                    div {
-                        class: "actions",
+                    div { class: "actions",
                         IconButton {
                             icon: LdPen,
                             onclick: async |_| {
@@ -171,7 +184,7 @@ fn ProjectList() -> Element {
                             class: "delete",
                             onclick: async |_| {
                                 info!("Deleting");
-                            }
+                            },
                         }
                     }
                 }
