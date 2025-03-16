@@ -6,17 +6,18 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	integrations: [
 		starlight({
-			title: 'My Docs',
-			social: {
-				github: 'https://github.com/withastro/starlight',
+			title: 'Marvin Light Control',
+			logo: {
+				src: "./src/assets/icon.png",
 			},
+			social: {
+				github: 'https://github.com/PixelboysTM/marvin_light_control',
+			},
+			customCss: ["./src/styles/custom.css",],
 			sidebar: [
 				{
 					label: 'Guides',
-					items: [
-						// Each item here is one entry in the navigation menu.
-						{ label: 'Example Guide', slug: 'guides/example' },
-					],
+					autogenerate: { directory: 'guides' },
 				},
 				{
 					label: 'Reference',

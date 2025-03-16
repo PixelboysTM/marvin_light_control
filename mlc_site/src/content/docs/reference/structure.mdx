@@ -1,0 +1,91 @@
+---
+title: Repository Layout
+description: A quick overview over the MLC Repository structure.
+---
+
+## Subprojects
+
+The Repository for Marvin Light Control consists of six different subprojects which each serve their own specific use case.
+
+import { FileTree, Aside } from '@astrojs/starlight/components';
+
+<FileTree>
+- marvin_light_control
+    - mlc_communication/
+    - mlc_data/
+    - mlc_interface/
+    - mlc_ofl/
+    - mlc_server/
+    - mlc_site/
+    - ...
+</FileTree>
+
+### _mlc_communication_
+
+This Rust library contains all common networking related code. MLC uses the [remoc](https://crates.io/crates/remoc) Crate to allow function based communication between the server and interface.
+
+#### Specs:
+```yaml
+depends_on:
+    - mlc_data
+is_used_by:
+    - mlc_server
+    - mlc_interface
+```
+
+### _mlc_data_
+
+This Rust library contains all the common data types and functionality which is needed across the backend and frontend. Examples are the `blueprint` representation of Fixtures or helper Types such as `BoundedValue<MIN, MAX, _>`
+
+#### Specs:
+```yaml
+depends_on:
+is_used_by:
+    - mlc_communication
+    - mlc_interface
+    - mlc_server
+```
+
+### _mlc_interface_
+
+The interface contains an Dioxus project targeting Desktop platforms. It holds as the name suggests the inetrface which connects to the server to control its functionality. It is the primary way of creating and controling projects on the server.
+
+<Aside type='note'>Due to limitations in the [remoc](https://crates.io/crates/remoc) crate and it not working properly in WebAssembly, the interface currently doesn't compile for the web. And mobile is untested.</Aside>
+
+#### Specs:
+```yaml
+depends_on:
+    - mlc_communication
+    - mlc_data
+is_used_by:
+```
+
+### _mlc_ofl_
+
+The Rust ofl project acts as both a library and an executable, for integrating with the [Open Fixture Library](https://open-fixture-library.org/). It mainly contains parsing functionality to convert fixture blueprints from OFLs json format, into MLCs `FixtureBlueprint` type. Even though both data formats have a lot in common and MLCs `FixtureBlueprint` was based on OFLs json, due to the need of a very rigid data format, some variable defined aspects need to be streamlined by the parser.
+Even though MLCs goal is to be able to import 100% of OFLs library, it is not the goal to use all the features OFl captures.
+
+#### Specs:
+```yaml
+depends_on:
+    - mlc_data
+is_used_by:
+    - mlc_server
+```
+
+### _mlc_server_
+
+The Server is the heart of all action it runs as a dedicated headless program which exposes control functionality via the `mlc_communication` Api. It's machine is responsible for communicating to endpoints running effects and maintaining project data. To leverage it's highly multithreaded architecture it is generally advised to run it on a maschine with at least eight logical processors.
+
+#### Specs:
+```yaml
+depends_on:
+    - mlc_communication
+    - mlc_data
+    - mlc_ofl
+is_used_by:
+```
+
+### _mlc_site_
+
+This is the Astro Site you are currently on and contains all the source of the main MLC Website at [marvinlightcontrol.de](https://marvinlightcontrol.de)
