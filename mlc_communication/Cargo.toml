@@ -16,8 +16,8 @@ tokio = { workspace = true }
 async-trait.workspace = true
 serde_json = "1.0.139"
 # wtransport.workspace = true
-remoc = { version = "*", default-features = false, features = [
+remoc = { version = "^0.15", default-features = false, features = [
     "full",
     "codec-bincode",
-    "default-codec-bincode",
+    "default-codec-bincode2",
 ] }
