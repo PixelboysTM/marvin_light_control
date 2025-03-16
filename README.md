@@ -3,7 +3,7 @@
 ![MLC Control Panel](./images/mlc_configure_page.png)
 
 > [!NOTE]
-> The image above was created before the rewrite was started.
+> The image above was created before the rewrite was started. And depicts code from [mlc_engine](https://github.com/PixelboysTM/mlc_engine/)
 
 Marvin Light Control (MLC for short) is a DmxShow creation and playback tool. It utilizes a timeline based approach to time and playback light and other stage effects. The Dmx protocol with its wide use cases and Network adaptions makes it highly compatible with most common stage fixtures. MLC can interface with different fixtures through endpoints, planned types of endpoints include sACN , ArtNet and Entec enabled USB-Interfaces.
 
