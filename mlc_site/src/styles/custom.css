@@ -39,9 +39,9 @@
 
 /* Light mode colors. */
 :root[data-theme='light'] {
-    --sl-color-accent-low: #c7d6ff;
-    --sl-color-accent: #364bff;
-    --sl-color-accent-high: #182775;
+    --sl-color-accent-low: hsl(0, 100%, 85%);
+    --sl-color-accent: hsl(0, 100%, 62%);
+    --sl-color-accent-high: hsl(0, 61%, 19%);
     --sl-color-white: #17181c;
     --sl-color-gray-1: #24272f;
     --sl-color-gray-2: #353841;
@@ -51,4 +51,28 @@
     --sl-color-gray-6: #eceef2;
     --sl-color-gray-7: #f5f6f8;
     --sl-color-black: #ffffff;
+
+    --c-bg: #d9d8d8;
+    --c-bg-t: #d9d8d8e5;
+    --c-pnl: #836f6f;
+
+    --c-p: #ff3e3e;
+    --c-s: #3eff41;
+    --c-t: #3e88ff;
+    --c-txt: #fff;
+    --c-info: #44a44a;
+    --c-warn: #ffa83e;
+    --c-err: #d62525;
+
+    --c-btn: #1a1a1a;
+    --c-disabled: #5a5a5a;
+
+    --sl-color-text: var(--txt);
+    --sl-color-text-accent: var(--sl-color-accent-high);
+    --sl-color-text-invert: var(--sl-color-accent-low);
+    --sl-color-bg: var(--c-bg);
+    --sl-color-bg-nav: var(--c-pnl);
+    --sl-color-bg-sidebar: var(--c-pnl);
+    --sl-color-bg-inline-code: var(--sl-color-gray-5);
+    --sl-color-bg-accent: var(--c-p);
 }
