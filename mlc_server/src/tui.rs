@@ -6,8 +6,8 @@ use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Rect},
     style::Stylize,
     symbols::border,
-    text::Line,
-    widgets::{Block, Clear, Paragraph, Widget},
+    text::{Line, ToLine},
+    widgets::{Block, Clear, Paragraph, Widget, Wrap},
 };
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
@@ -117,24 +117,41 @@ impl Widget for &TuiApp {
         Self: Sized,
     {
         let title = Line::from(vec![
+            " ".into(),
             "Marvin".red(),
             " ".into(),
             "Light".green(),
             " ".into(),
             "Control".blue(),
+            " ".into(),
         ]);
+        // Paragraph::new(title.centered().on_white().bold()).render(layout[0], buf);
+
+        let main_block = Block::bordered()
+            .title(title.centered().bold())
+            .border_set(border::ROUNDED)
+            .border_type(ratatui::widgets::BorderType::Thick);
+        let a2 = main_block.inner(area);
+        main_block.render(area, buf);
+        let area = a2;
 
         let layout = Layout::new(
             Direction::Vertical,
-            [
-                Constraint::Length(1),
-                Constraint::Fill(1),
-                Constraint::Fill(4),
-            ],
+            [Constraint::Fill(1), Constraint::Fill(4)],
         )
         .split(area);
 
-        Paragraph::new(title.centered().underlined().bold()).render(layout[0], buf);
+        let meta_block = Block::bordered().title("Meta").border_set(border::ROUNDED);
+
+        match &self.meta_information {
+            Some(_meta) => Paragraph::new("MetaInformmation tui not implemented")
+                .block(meta_block)
+                .render(layout[0], buf),
+            None => Paragraph::new("No Project is currently loaded")
+                .alignment(ratatui::layout::Alignment::Center)
+                .block(meta_block)
+                .render(layout[0], buf),
+        }
 
         let block = Block::bordered()
             .title("LOG")
@@ -144,20 +161,25 @@ impl Widget for &TuiApp {
         tui_logger::TuiLoggerWidget::default()
             .block(block)
             .formatter(Box::new(TuiLogFormatter))
-            .render(layout[2], buf);
+            .render(layout[1], buf);
 
         if matches!(self.exit, ExitState::UserConfirm) {
             let mut btns = Line::default();
-            btns.push_span("[YES (y)]".on_green().black());
+            btns.push_span("[YES (y)]");
             btns.push_span("-");
-            btns.push_span("[NO (n)]".on_green().black());
+            btns.push_span("[NO (n)]");
 
             let block = Block::bordered().title_bottom(btns);
-            let area = popup_area(area, 50, 40);
+            let area = popup_area(area, 30, 20);
             Clear.render(area, buf);
-            Paragraph::new("Are u sure you want to quit Marvin Light Control?")
-                .block(block)
-                .render(area, buf);
+            Paragraph::new(
+                "Are u sure you want to quit Marvin Light Control?"
+                    .to_line()
+                    .centered(),
+            )
+            .block(block)
+            .wrap(Wrap { trim: true })
+            .render(area, buf);
         }
     }
 }
