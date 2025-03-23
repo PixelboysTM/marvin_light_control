@@ -1,34 +1,51 @@
-use std::io;
+use std::{io, sync::Arc, time::Duration};
 
 use ratatui::{
     DefaultTerminal, Frame,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    layout::{Constraint, Flex, Layout, Rect},
     style::Stylize,
     symbols::border,
     text::Line,
-    widgets::{Block, Widget},
+    widgets::{Block, Clear, Paragraph, Widget},
 };
+use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use tui_logger::{ExtLogRecord, LogFormatter};
 
-#[allow(dead_code)]
-pub async fn create_tui() {
+// #[allow(dead_code)]
+pub async fn create_tui(shutdown_handler: CancellationToken, exit_flag: Arc<RwLock<bool>>) {
     log::info!("Starting Ratatui...");
     let mut terminal = ratatui::init();
-    let app_result = TuiApp { exit: false }.run(&mut terminal);
+    let app_result = TuiApp {
+        exit: ExitState::Idle,
+        shutdown_handler,
+        exit_flag,
+    }
+    .run(&mut terminal)
+    .await;
     ratatui::restore();
     app_result.unwrap();
 }
 
 #[derive(Debug)]
 pub struct TuiApp {
-    exit: bool,
+    exit: ExitState,
+    shutdown_handler: CancellationToken,
+    exit_flag: Arc<RwLock<bool>>,
 }
 
 impl TuiApp {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while !self.exit {
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        while !matches!(self.exit, ExitState::Quit) {
+            if *self.exit_flag.read().await {
+                self.exit = ExitState::Quit;
+            }
+
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
+
+            tokio::task::yield_now().await;
         }
         Ok(())
     }
@@ -38,6 +55,9 @@ impl TuiApp {
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
+        if !event::poll(Duration::from_millis(250))? {
+            return Ok(());
+        }
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_event(key_event)
@@ -50,7 +70,22 @@ impl TuiApp {
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match &key_event.code {
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.exit = true
+                self.exit = match self.exit {
+                    ExitState::Idle => ExitState::UserConfirm,
+                    ExitState::UserConfirm => {
+                        self.shutdown_handler.cancel();
+                        ExitState::Exiting
+                    }
+                    ExitState::Exiting => ExitState::Quit,
+                    ExitState::Quit => ExitState::Quit,
+                }
+            }
+            KeyCode::Char('y') if self.exit == ExitState::UserConfirm => {
+                self.shutdown_handler.cancel();
+                self.exit = ExitState::Exiting;
+            }
+            KeyCode::Char('n') if self.exit == ExitState::UserConfirm => {
+                self.exit = ExitState::Idle;
             }
             _ => {}
         }
@@ -81,9 +116,19 @@ impl Widget for &TuiApp {
             .formatter(Box::new(TuiLogFormatter))
             .render(area, buf);
 
-        // Paragraph::new(Line::from("Hello"))
-        //     .block(block)
-        //     .render(area, buf);
+        if matches!(self.exit, ExitState::UserConfirm) {
+            let mut btns = Line::default();
+            btns.push_span("[YES (y)]".on_green().black());
+            btns.push_span("-");
+            btns.push_span("[NO (n)]".on_green().black());
+
+            let block = Block::bordered().title_bottom(btns);
+            let area = popup_area(area, 50, 40);
+            Clear.render(area, buf);
+            Paragraph::new("Are u sure you want to quit Marvin Light Control?")
+                .block(block)
+                .render(area, buf);
+        }
     }
 }
 
@@ -120,4 +165,20 @@ impl LogFormatter for TuiLogFormatter {
 
         vec![line]
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ExitState {
+    Idle,
+    UserConfirm,
+    Exiting,
+    Quit,
+}
+
+fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
 }

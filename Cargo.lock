@@ -3160,6 +3160,7 @@ dependencies = [
  "ratatui",
  "serde",
  "tokio",
+ "tokio-util",
  "tui-logger",
 ]
 

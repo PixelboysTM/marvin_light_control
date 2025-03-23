@@ -1,7 +1,6 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU8, Ordering};
 
-use fern::colors::{Color, ColoredLevelConfig};
 use log::{debug, error, info, trace, warn};
 use mlc_communication as com;
 use mlc_communication::remoc::prelude::*;
@@ -12,8 +11,8 @@ use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
 use project::Project;
 use server::setup_server;
-use tokio::sync::RwLock;
-use tokio::time::sleep;
+use tokio::sync::{Notify, RwLock};
+use tokio_util::sync::CancellationToken;
 use tui::create_tui;
 
 mod project;
@@ -98,10 +97,21 @@ async fn main() {
         info_subscribers: Arc::new(RwLock::new(Vec::new())),
         status_subscribers: Arc::new(RwLock::new(Vec::new())),
     }));
-    // let s2 = service_obj.clone();
 
-    let server_handle = tokio::spawn(setup_server(8181, service_obj));
-    let tui_handle = tokio::spawn(create_tui());
+    let task_cancel_token = CancellationToken::new();
+    let mut task_handles = vec![];
+
+    task_handles.push(tokio::spawn(setup_server(
+        8181,
+        service_obj,
+        task_cancel_token.clone(),
+    )));
+
+    let should_tui_exit = Arc::new(RwLock::new(false));
+    let tui_handle = tokio::spawn(create_tui(
+        task_cancel_token.clone(),
+        should_tui_exit.clone(),
+    ));
 
     // let idle = tokio::spawn(async move {
     //     loop {
@@ -116,8 +126,13 @@ async fn main() {
     warn!("This is a warning");
     error!("This is a error");
 
-    // idle.await.unwrap();
-    server_handle.await.unwrap();
+    for handle in task_handles {
+        handle.await.unwrap();
+    }
+
+    info!("Aquire tui exit");
+    *should_tui_exit.write().await = true;
+
     tui_handle.await.unwrap();
 }
 
