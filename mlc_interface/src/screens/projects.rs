@@ -1,4 +1,5 @@
 use crate::connect::connect;
+use crate::toaster::ToastInfo;
 use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
 use chrono::{Days, Local};
 use dioxus::logger::tracing::{info, trace, warn};
@@ -49,6 +50,10 @@ pub fn Project() -> Element {
                 match *i {
                     Info::Idle => {
                         warn!("Info Idle")
+                    }
+                    Info::Shutdown => {
+                        ToastInfo::info("Shutdown", "The backend shutdown!").post();
+                        navigator().replace("/");
                     }
                 }
             }

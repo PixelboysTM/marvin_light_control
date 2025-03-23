@@ -1,17 +1,16 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
 
 use log::{debug, error, info, trace, warn};
 use mlc_communication as com;
 use mlc_communication::remoc::prelude::*;
-use mlc_communication::remoc::rch::watch;
+use mlc_communication::remoc::rch::watch::{self, SendError};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
 use project::Project;
 use server::setup_server;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tui::create_tui;
 
@@ -103,7 +102,11 @@ async fn main() {
 
     task_handles.push(tokio::spawn(setup_server(
         8181,
-        service_obj,
+        service_obj.clone(),
+        task_cancel_token.clone(),
+    )));
+    task_handles.push(tokio::spawn(create_shutdown_notifier(
+        service_obj.clone(),
         task_cancel_token.clone(),
     )));
 
@@ -136,8 +139,31 @@ async fn main() {
     tui_handle.await.unwrap();
 }
 
+async fn create_shutdown_notifier(
+    obj: Arc<RwLock<ServiceImpl>>,
+    task_cancel_token: CancellationToken,
+) {
+    task_cancel_token.cancelled().await;
+    let _ = obj.read().await.info_subscribers.send(Info::Shutdown).await;
+}
+
 fn setup_logging() -> Result<(), fern::InitError> {
     tui_logger::init_logger(log::LevelFilter::Trace).expect("Hello");
     tui_logger::set_default_level(log::LevelFilter::Trace);
     Ok(())
+}
+
+trait SenderExt<T, E = ()> {
+    async fn send(&self, msg: T) -> Result<(), E>;
+}
+
+impl<T: Send + Clone + 'static> SenderExt<T, SendError> for Arc<RwLock<Vec<Sender<T>>>> {
+    async fn send(&self, msg: T) -> Result<(), SendError> {
+        let r = self.read().await;
+        for s in &*r {
+            s.send(msg.clone())?;
+        }
+
+        Ok(())
+    }
 }
