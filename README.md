@@ -25,7 +25,7 @@ To run MLC on your local machine the following steps will help you:
 
 ## Reference / Roadmap
 
-A more detailed reference on how MLC is built and a Roadmap is available at [marvinlightcontrol.de](https://marinlightcontrol.de)
+A more detailed reference on how MLC is built and a Roadmap is available at [marvinlightcontrol.de](https://marvinlightcontrol.de/reference/roadmap/)
 
 ## Feature requests / Contribution
 If you have a feature you want to see in the Program or even think about implementing it yourself, feel free to open an issue describing your idea. We have a lot of ideas where we want to take MLC in the future and would love to discuss your ideas with you. The same is with bugs feel free to report any bugs you find, but keep in mind MLC is not nearly in a stable state so keeping the software 100% bug free is not a priority (yet).
