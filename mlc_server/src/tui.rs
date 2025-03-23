@@ -6,8 +6,9 @@ use ratatui::{
     style::Stylize,
     symbols::border,
     text::Line,
-    widgets::{Block, Paragraph, Widget},
+    widgets::{Block, Widget},
 };
+use tui_logger::{ExtLogRecord, LogFormatter};
 
 #[allow(dead_code)]
 pub async fn create_tui() {
@@ -75,8 +76,48 @@ impl Widget for &TuiApp {
             .title_bottom(Line::from("Ctrl + C to exit".underlined()))
             .border_set(border::ROUNDED);
 
-        Paragraph::new(Line::from("Hello"))
+        tui_logger::TuiLoggerWidget::default()
             .block(block)
+            .formatter(Box::new(TuiLogFormatter))
             .render(area, buf);
+
+        // Paragraph::new(Line::from("Hello"))
+        //     .block(block)
+        //     .render(area, buf);
+    }
+}
+
+struct TuiLogFormatter;
+impl LogFormatter for TuiLogFormatter {
+    fn min_width(&self) -> u16 {
+        4
+    }
+    fn format(&self, _width: usize, evt: &ExtLogRecord) -> Vec<Line> {
+        let mut line = Line::from("[");
+
+        line.push_span(format!("{} ", evt.timestamp.format("%H:%M.%S")));
+
+        line.push_span(match evt.level {
+            log::Level::Error => "ERROR".red(),
+            log::Level::Warn => "WARN ".yellow(),
+            log::Level::Info => "INFO ".green(),
+            log::Level::Debug => "DEBUG".blue(),
+            log::Level::Trace => "TRACE".gray(),
+        });
+
+        #[cfg(debug_assertions)]
+        if let Some(m) = evt.module_path() {
+            line.push_span(format!(
+                " {}:{}",
+                m,
+                evt.line.map(|i| i as i64).unwrap_or(-1)
+            ));
+        }
+
+        line.push_span("] ");
+
+        line.push_span(evt.msg().to_string());
+
+        vec![line]
     }
 }

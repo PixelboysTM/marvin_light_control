@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fern::colors::{Color, ColoredLevelConfig};
-use log::{debug, error};
+use log::{debug, error, info, trace, warn};
 use mlc_communication as com;
 use mlc_communication::remoc::prelude::*;
 use mlc_communication::remoc::rch::watch;
@@ -14,6 +14,7 @@ use project::Project;
 use server::setup_server;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
+use tui::create_tui;
 
 mod project;
 mod server;
@@ -100,7 +101,7 @@ async fn main() {
     // let s2 = service_obj.clone();
 
     let server_handle = tokio::spawn(setup_server(8181, service_obj));
-    // let tui_handle = tokio::spawn(create_tui());
+    let tui_handle = tokio::spawn(create_tui());
 
     // let idle = tokio::spawn(async move {
     //     loop {
@@ -109,26 +110,19 @@ async fn main() {
     //     }
     // });
 
+    trace!("This is a trace");
+    debug!("This is a debug");
+    info!("This is a info");
+    warn!("This is a warning");
+    error!("This is a error");
+
     // idle.await.unwrap();
     server_handle.await.unwrap();
-    // tui_handle.await.unwrap();
+    tui_handle.await.unwrap();
 }
 
 fn setup_logging() -> Result<(), fern::InitError> {
-    let colors = ColoredLevelConfig::new().info(Color::Green);
-
-    fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "[{} {}] {}",
-                chrono::Local::now().format("%H:%M.%S"),
-                colors.color(record.level()),
-                message
-            ))
-        })
-        .level(log::LevelFilter::Debug)
-        .chain(std::io::stdout())
-        // .chain(fern::log_file("output.log")?)
-        .apply()?;
+    tui_logger::init_logger(log::LevelFilter::Trace).expect("Hello");
+    tui_logger::set_default_level(log::LevelFilter::Trace);
     Ok(())
 }
