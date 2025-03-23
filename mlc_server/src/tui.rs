@@ -3,7 +3,7 @@ use std::{io, sync::Arc, time::Duration};
 use ratatui::{
     DefaultTerminal, Frame,
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    layout::{Constraint, Flex, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
     style::Stylize,
     symbols::border,
     text::Line,
@@ -13,14 +13,21 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tui_logger::{ExtLogRecord, LogFormatter};
 
-// #[allow(dead_code)]
-pub async fn create_tui(shutdown_handler: CancellationToken, exit_flag: Arc<RwLock<bool>>) {
+use crate::AServiceImpl;
+
+pub async fn create_tui(
+    shutdown_handler: CancellationToken,
+    exit_flag: Arc<RwLock<bool>>,
+    service_obj: AServiceImpl,
+) {
     log::info!("Starting Ratatui...");
     let mut terminal = ratatui::init();
     let app_result = TuiApp {
         exit: ExitState::Idle,
         shutdown_handler,
         exit_flag,
+        meta_information: None,
+        service_obj,
     }
     .run(&mut terminal)
     .await;
@@ -28,11 +35,12 @@ pub async fn create_tui(shutdown_handler: CancellationToken, exit_flag: Arc<RwLo
     app_result.unwrap();
 }
 
-#[derive(Debug)]
 pub struct TuiApp {
     exit: ExitState,
     shutdown_handler: CancellationToken,
     exit_flag: Arc<RwLock<bool>>,
+    meta_information: Option<MetaInformation>,
+    service_obj: AServiceImpl,
 }
 
 impl TuiApp {
@@ -42,12 +50,23 @@ impl TuiApp {
                 self.exit = ExitState::Quit;
             }
 
+            self.update_meta_information().await;
+
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
 
             tokio::task::yield_now().await;
         }
         Ok(())
+    }
+
+    async fn update_meta_information(&mut self) {
+        let obj = self.service_obj.read().await;
+        if *obj.valid_project.read().await {
+            self.meta_information = Some(MetaInformation {});
+        } else {
+            self.meta_information = None;
+        }
     }
 
     fn draw(&self, frame: &mut Frame) {
@@ -98,23 +117,34 @@ impl Widget for &TuiApp {
         Self: Sized,
     {
         let title = Line::from(vec![
-            " ".into(),
             "Marvin".red(),
             " ".into(),
             "Light".green(),
             " ".into(),
             "Control".blue(),
-            " ".into(),
         ]);
+
+        let layout = Layout::new(
+            Direction::Vertical,
+            [
+                Constraint::Length(1),
+                Constraint::Fill(1),
+                Constraint::Fill(4),
+            ],
+        )
+        .split(area);
+
+        Paragraph::new(title.centered().underlined().bold()).render(layout[0], buf);
+
         let block = Block::bordered()
-            .title(title.centered())
+            .title("LOG")
             .title_bottom(Line::from("Ctrl + C to exit".underlined()))
             .border_set(border::ROUNDED);
 
         tui_logger::TuiLoggerWidget::default()
             .block(block)
             .formatter(Box::new(TuiLogFormatter))
-            .render(area, buf);
+            .render(layout[2], buf);
 
         if matches!(self.exit, ExitState::UserConfirm) {
             let mut btns = Line::default();
@@ -182,3 +212,6 @@ fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
     let [area] = horizontal.areas(area);
     area
 }
+
+#[derive(Debug)]
+struct MetaInformation {}

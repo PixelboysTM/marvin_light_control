@@ -11,6 +11,7 @@ use mlc_communication::services::general::{Alive, View};
 use project::Project;
 use server::setup_server;
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tui::create_tui;
 
@@ -23,6 +24,7 @@ pub struct ServiceImpl {
     info_subscribers: Arc<RwLock<Vec<Sender<Info>>>>,
     status_subscribers: Arc<RwLock<Vec<Sender<String>>>>,
 }
+pub type AServiceImpl = Arc<RwLock<ServiceImpl>>;
 
 impl ServiceImpl {
     pub async fn send_info(&self, info: Info) {
@@ -100,28 +102,22 @@ async fn main() {
     let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
 
-    task_handles.push(tokio::spawn(setup_server(
+    task_handles.spawn(setup_server(
         8181,
         service_obj.clone(),
         task_cancel_token.clone(),
-    )));
-    task_handles.push(tokio::spawn(create_shutdown_notifier(
+    ));
+    task_handles.spawn(create_shutdown_notifier(
         service_obj.clone(),
         task_cancel_token.clone(),
-    )));
+    ));
 
     let should_tui_exit = Arc::new(RwLock::new(false));
     let tui_handle = tokio::spawn(create_tui(
         task_cancel_token.clone(),
         should_tui_exit.clone(),
+        service_obj.clone(),
     ));
-
-    // let idle = tokio::spawn(async move {
-    //     loop {
-    //         sleep(Duration::from_secs(2)).await;
-    //         s2.read().await.send_info(Info::Idle).await;
-    //     }
-    // });
 
     trace!("This is a trace");
     debug!("This is a debug");
@@ -165,5 +161,19 @@ impl<T: Send + Clone + 'static> SenderExt<T, SendError> for Arc<RwLock<Vec<Sende
         }
 
         Ok(())
+    }
+}
+
+pub trait SpawnExt<S> {
+    fn spawn(&mut self, s: S);
+}
+
+impl<F> SpawnExt<F> for Vec<JoinHandle<F::Output>>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    fn spawn(&mut self, s: F) {
+        self.push(tokio::spawn(s));
     }
 }
