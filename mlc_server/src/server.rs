@@ -1,6 +1,7 @@
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
+use log::error;
 use mlc_communication::remoc::rtc::ServerBase;
 use mlc_communication::remoc::{self, prelude::*};
 use mlc_communication::{ServiceIdentifiable, services::*};
@@ -21,16 +22,15 @@ pub async fn setup_server(
     log::info!("Starting Server...");
 
     log::info!("Listening on port {}", port);
-    let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, port))
-        .await
-        .unwrap();
+    let listener = match TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).await {
+        Ok(l) => l,
+        Err(e) => {
+            error!("Could not start server. Got error:\n {e:#?}");
+            return;
+        }
+    };
 
     loop {
-        // if shutdown.should_exit() {
-        //     log::info!("Shutting down Server! Not listening anymore."); // TODO: Maybe quit all listenening tasks
-        //     break;
-        // }
-
         select! {
             _ = shutdown.cancelled() => {
                 log::info!("Shutting down Server! Not listening anymore.");
