@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
-use mlc_communication as com;
 use mlc_communication::remoc::prelude::*;
-use mlc_communication::remoc::rch::watch::{self, SendError};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
+use mlc_communication::{self as com, remoc};
 use project::Project;
 use server::setup_server;
 use tokio::sync::RwLock;
@@ -18,42 +17,22 @@ use tui::create_tui;
 mod project;
 mod server;
 mod tui;
+
+const DEFAULT_SERVER_PORT: u16 = 8181;
+
 pub struct ServiceImpl {
     project: Arc<RwLock<Project>>,
     valid_project: Arc<RwLock<bool>>,
-    info_subscribers: Arc<RwLock<Vec<Sender<Info>>>>,
-    status_subscribers: Arc<RwLock<Vec<Sender<String>>>>,
+    info_subscribers: Sender<Info>,
+    status_subscribers: Sender<String>,
 }
 pub type AServiceImpl = Arc<RwLock<ServiceImpl>>;
 
 impl ServiceImpl {
-    pub async fn send_info(&self, info: Info) {
-        let mut is = self.info_subscribers.write().await;
-        is.retain(|s| {
-            let r = s.send(info.clone());
-            if let Err(e) = r {
-                match e {
-                    watch::SendError::Closed => {
-                        debug!("InfoSubscriber connection closed")
-                    }
-                    watch::SendError::RemoteSend(send_error_kind) => {
-                        error!("InfoSubscriber Error RemoteSend: {send_error_kind:?}")
-                    }
-                    watch::SendError::RemoteConnect(connect_error) => {
-                        error!("InfoSubscriber Error RemoteConnect: {connect_error:?}")
-                    }
-                    watch::SendError::RemoteListen(listener_error) => {
-                        error!("InfoSubscriber Error RemoteListen: {listener_error:?}")
-                    }
-                    watch::SendError::RemoteForward => {
-                        error!("InfoSubscriber Error RemmoteForward")
-                    }
-                }
-                false
-            } else {
-                true
-            }
-        });
+    pub fn send_info(&self, info: Info) {
+        if let Err(err) = self.info_subscribers.send(info) {
+            eprintln!("SendInfo error: {err:#?}");
+        }
     }
 }
 
@@ -70,18 +49,12 @@ impl com::services::general::GeneralService for ServiceImpl {
     }
 
     async fn info(&self) -> Result<Receiver<Info>, CallError> {
-        let (tx, rx) = watch::channel(Info::Idle);
-
-        self.info_subscribers.write().await.push(tx);
-
+        let rx = self.info_subscribers.subscribe();
         Ok(rx)
     }
 
     async fn status(&self) -> Result<Receiver<String>, CallError> {
-        let (tx, rx) = watch::channel(String::new());
-
-        self.status_subscribers.write().await.push(tx);
-
+        let rx = self.status_subscribers.subscribe();
         Ok(rx)
     }
 }
@@ -95,15 +68,15 @@ async fn main() {
     let service_obj = Arc::new(RwLock::new(ServiceImpl {
         project,
         valid_project: Arc::new(RwLock::new(false)),
-        info_subscribers: Arc::new(RwLock::new(Vec::new())),
-        status_subscribers: Arc::new(RwLock::new(Vec::new())),
+        info_subscribers: remoc::rch::watch::channel(Info::Idle).0,
+        status_subscribers: remoc::rch::watch::channel(String::new()).0,
     }));
 
     let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
 
     task_handles.spawn(setup_server(
-        8181,
+        DEFAULT_SERVER_PORT,
         service_obj.clone(),
         task_cancel_token.clone(),
     ));
@@ -140,28 +113,13 @@ async fn create_shutdown_notifier(
     task_cancel_token: CancellationToken,
 ) {
     task_cancel_token.cancelled().await;
-    let _ = obj.read().await.info_subscribers.send(Info::Shutdown).await;
+    let _ = obj.read().await.send_info(Info::Shutdown);
 }
 
 fn setup_logging() -> Result<(), fern::InitError> {
     tui_logger::init_logger(log::LevelFilter::Trace).expect("Hello");
     tui_logger::set_default_level(log::LevelFilter::Trace);
     Ok(())
-}
-
-trait SenderExt<T, E = ()> {
-    async fn send(&self, msg: T) -> Result<(), E>;
-}
-
-impl<T: Send + Clone + 'static> SenderExt<T, SendError> for Arc<RwLock<Vec<Sender<T>>>> {
-    async fn send(&self, msg: T) -> Result<(), SendError> {
-        let r = self.read().await;
-        for s in &*r {
-            s.send(msg.clone())?;
-        }
-
-        Ok(())
-    }
 }
 
 pub trait SpawnExt<S> {
