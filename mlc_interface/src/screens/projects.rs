@@ -10,6 +10,8 @@ use dioxus_free_icons::Icon;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, View as GenView};
 use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
 use uuid::Uuid;
+use mlc_communication::services::project_selection::{ProjectSelectionService, ProjectSelectionServiceClient, ProjectSelectionServiceIdent};
+use crate::connect;
 
 const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
@@ -128,9 +130,14 @@ fn gen_projects(i: usize) -> Vec<ProjectMetadata> {
 
 #[component]
 fn ProjectList() -> Element {
-    let projects = use_resource(async || {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        gen_projects(30)
+    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented")).suspend()?;
+        let s2 = service.clone();
+
+    let projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
+        let s2 = s2.clone();
+        async move {
+            s2.read().list().await.expect("Couldn't get projects")
+        }
     })
     .suspend()?;
 

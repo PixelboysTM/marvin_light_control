@@ -11,6 +11,7 @@ use mlc_communication::remoc::rch::watch;
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
+use crate::project::create_default_project;
 
 mod project;
 mod server;
@@ -55,7 +56,7 @@ impl com::services::general::GeneralService for ServiceImpl {
 async fn main() {
     setup_logging().unwrap();
 
-    let project = Arc::new(RwLock::new(Project::new()));
+    let project = Arc::new(RwLock::new(create_default_project()));
 
     let service_obj = Arc::new(RwLock::new(ServiceImpl {
         project,

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local};
 use uuid::Uuid;
 
+
 #[derive(PartialEq, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub enum ProjectType {
     #[default]
@@ -10,9 +11,12 @@ pub enum ProjectType {
 
 impl ProjectType {
     pub fn extension(&self) -> &'static str {
+        &self.dotted_extension()[1..]
+    }
+    pub fn dotted_extension(&self) -> &'static str {
         match self {
-            ProjectType::Json => "json",
-            ProjectType::Binary => "mbp",
+            ProjectType::Json => ".json",
+            ProjectType::Binary => ".mbp",
         }
     }
 }
