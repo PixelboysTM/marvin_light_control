@@ -2,11 +2,16 @@ use std::path::PathBuf;
 use mlc_data::{fixture::blueprint::FixtureBlueprint, project::{ProjectMetadata, ProjectType}, uuid};
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
+use crate::ServiceImpl;
 use mlc_communication::remoc::rtc;
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::project_selection::{ProjectSelectionService, ProjectSelectionServiceError};
 use mlc_data::uuid::Uuid;
-use crate::ServiceImpl;
+use mlc_data::{
+    fixture::blueprint::FixtureBlueprint,
+    project::{ProjectMetadata, ProjectType},
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -59,7 +64,7 @@ impl ProjectSelectionService for ServiceImpl {
                 }
             }
 
-        }else { 
+        }else {
             log::error!("Couldn't get base project dir");
         }
 

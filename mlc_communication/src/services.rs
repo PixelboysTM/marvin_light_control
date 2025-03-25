@@ -1,7 +1,7 @@
 pub mod general {
     use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifier};
     use macro_rules_attribute::derive;
-    use remoc::{rtc, rch::watch};
+    use remoc::{rch::watch, rtc};
 
     pub struct GeneralServiceIdent;
     impl ServiceIdentifiable for GeneralServiceIdent {
@@ -20,7 +20,8 @@ pub mod general {
 
     #[derive(Com!)]
     pub enum Info {
-        Idle
+        Idle,
+        Shutdown,
     }
 
     #[rtc::remote]
@@ -35,9 +36,10 @@ pub mod general {
 pub mod project_selection {
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
+    use crate::{ServiceIdentifiable, ServiceIdentifier};
     use mlc_data::project::{ProjectMetadata, ProjectType};
     use mlc_data::uuid::Uuid;
-    use crate::{ServiceIdentifiable, ServiceIdentifier};
+    use remoc::rtc;
 
     pub struct ProjectSelectionServiceIdent;
     impl ServiceIdentifiable for ProjectSelectionServiceIdent {

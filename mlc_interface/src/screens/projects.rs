@@ -1,13 +1,17 @@
 use crate::connect::connect;
+use crate::toaster::ToastInfo;
 use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
 use chrono::{Days, Local};
-use dioxus::logger::tracing::info;
+use dioxus::logger::tracing::{info, trace, warn};
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
     LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash,
 };
 use dioxus_free_icons::Icon;
-use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, View as GenView};
+use mlc_communication::remoc::rch::watch::ReceiverStream;
+use mlc_communication::services::general::{
+    GeneralService, GeneralServiceIdent, Info, View as GenView,
+};
 use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
 use uuid::Uuid;
 use mlc_communication::services::project_selection::{ProjectSelectionService, ProjectSelectionServiceClient, ProjectSelectionServiceIdent};
@@ -18,7 +22,7 @@ const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 const CREATE_PROJECT: Symbol = Symbol::create("create-project");
 #[component]
 pub fn Project() -> Element {
-    let _client = use_resource(async || {
+    let m_client = use_resource(async || {
         let res = connect::<GeneralServiceIdent>().await;
         if res.is_err() {
             navigator().replace("/");
@@ -28,9 +32,35 @@ pub fn Project() -> Element {
         if let Ok(false) = c.is_valid_view(GenView::Project).await {
             navigator().replace("/project/configure");
         }
+
         c
     })
     .suspend()?;
+
+    use_future(move || {
+        let value = m_client.clone();
+
+        async move {
+            let client = value.read();
+            let mut info = client.info().await.expect("Why not?");
+
+            loop {
+                info.changed().await.expect("Failed");
+
+                let i = info.borrow_and_update().expect("Failed");
+
+                match *i {
+                    Info::Idle => {
+                        warn!("Info Idle")
+                    }
+                    Info::Shutdown => {
+                        ToastInfo::info("Shutdown", "The backend shutdown!").post();
+                        navigator().replace("/");
+                    }
+                }
+            }
+        }
+    });
 
     let mut new_project_name = use_signal(|| "New Project".to_string());
     let mut new_project_type = use_signal(|| ProjectType::Json);

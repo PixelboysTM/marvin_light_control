@@ -7,12 +7,14 @@ edition.workspace = true
 
 [dependencies]
 tokio.workspace = true
+tokio-util = "0.7.14"
 mlc_communication = { path = "../mlc_communication" }
 mlc_data = { path = "../mlc_data" }
 log.workspace = true
 fern = { version = "0.7", features = ["colored"] }
 chrono = "*"
 ratatui = { version = "0.29.0", features = ["all-widgets"] }
+tui-logger = "0.17.0"
 serde.workspace = true
 bson.workspace = true
 json5.workspace = true
