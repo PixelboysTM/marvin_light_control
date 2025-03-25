@@ -19,6 +19,10 @@ impl ProjectType {
             ProjectType::Binary => ".mbp",
         }
     }
+
+    pub fn all() -> [ProjectType; 2] {
+        [ProjectType::Json, ProjectType::Binary]
+    }
 }
 
 pub trait ToFileName {

@@ -39,7 +39,6 @@ pub mod project_selection {
     use crate::{ServiceIdentifiable, ServiceIdentifier};
     use mlc_data::project::{ProjectMetadata, ProjectType};
     use mlc_data::uuid::Uuid;
-    use remoc::rtc;
 
     pub struct ProjectSelectionServiceIdent;
     impl ServiceIdentifiable for ProjectSelectionServiceIdent {
@@ -49,16 +48,25 @@ pub mod project_selection {
 
     #[rtc::remote]
     pub trait ProjectSelectionService {
-        async fn create(&self, name: String, kind: ProjectType) -> Result<(), ProjectSelectionServiceError>;
+        async fn create(&self, name: String, kind: ProjectType) -> Result<Uuid, ProjectSelectionServiceError>;
         async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError>;
-        async fn open(&self, id: Uuid) -> Result<bool, rtc::CallError>;
-        async fn delete(&self, id: Uuid) -> Result<(), rtc::CallError>;
+        async fn open(&self, id: Uuid) -> Result<bool, ProjectSelectionServiceError>;
+        async fn delete(&self, id: Uuid) -> Result<(), ProjectSelectionServiceError>;
     }
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
     pub enum ProjectSelectionServiceError {
         #[error("Failed to list all projects: {0:?}")]
         ProjectListError(String),
+
+        #[error("Failed to create project: {0:?}")]
+        ProjectCreateError(String),
+
+        #[error("Failed to open project: {0:?}")]
+        ProjectOpenError(String),
+
+        #[error("Failed to delete project: {0:?}")]
+        ProjectDeleteError(String),
 
         #[error("Network communication error: {0:?}")]
         RemocError(#[from] rtc::CallError),

@@ -1,6 +1,6 @@
 use crate::connect::connect;
 use crate::toaster::ToastInfo;
-use crate::utils::{Branding, IconButton, Loader, Modal, ModalVariant, Symbol};
+use crate::utils::{Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Symbol};
 use chrono::{Days, Local};
 use dioxus::logger::tracing::{info, trace, warn};
 use dioxus::prelude::*;
@@ -62,6 +62,17 @@ pub fn Project() -> Element {
         }
     });
 
+    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented")).suspend()?;
+    let s2 = service.clone();
+
+    let projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
+        let s2 = s2.clone();
+        async move {
+            s2.read().list().await.expect("Couldn't get projects")
+        }
+    })
+        .suspend()?;
+
     let mut new_project_name = use_signal(|| "New Project".to_string());
     let mut new_project_type = use_signal(|| ProjectType::Json);
     let is_json = use_memo(move || new_project_type.read().eq(&ProjectType::Json));
@@ -97,7 +108,9 @@ pub fn Project() -> Element {
                         Loader {}
                     }
                 },
-                ProjectList {}
+                ProjectList {
+                    projects
+                }
             }
 
             Modal {
@@ -105,7 +118,22 @@ pub fn Project() -> Element {
                 ident: CREATE_PROJECT.clone(),
                 icon: LdPlus,
                 variant: ModalVariant::OkCancel,
-                onexit: move |_| {},
+                onexit: move |r| {
+                    let s2 = service.clone();
+                    async move {
+                    if r == ModalResult::Cancel {
+                        return;
+                    }
+
+                    let id = s2.read().create(new_project_name.read().clone(), new_project_type.read().clone()).await.expect("Couldn't create project");
+                        let r = s2.read().open(id).await.expect("Couldn't open project");
+                        if r {
+                            navigator().replace("/project/configure");
+                        } else {
+                            ToastInfo::warn("Project not found", "The given project could not be located!").post();
+                        }
+                }},
+
                 oktext: "Create".to_string(),
                 label {
                     "Project Name: "
@@ -159,17 +187,8 @@ fn gen_projects(i: usize) -> Vec<ProjectMetadata> {
 }
 
 #[component]
-fn ProjectList() -> Element {
-    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented")).suspend()?;
-        let s2 = service.clone();
+fn ProjectList(projects: MappedSignal<Vec<ProjectMetadata>>) -> Element {
 
-    let projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
-        let s2 = s2.clone();
-        async move {
-            s2.read().list().await.expect("Couldn't get projects")
-        }
-    })
-    .suspend()?;
 
     rsx! {
         div { class: "projectList",

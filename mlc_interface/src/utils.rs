@@ -72,6 +72,7 @@ pub enum ModalVariant {
     OkCancel,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ModalResult {
     Success,
     Cancel,
