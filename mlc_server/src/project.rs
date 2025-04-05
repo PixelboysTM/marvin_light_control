@@ -14,6 +14,9 @@ use std::path::PathBuf;
 use chrono::{Local, Utc};
 use log::error;
 use tokio::io::AsyncReadExt;
+use crate::project::project_loader::get_loaders;
+
+mod project_loader;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -56,13 +59,21 @@ impl ProjectSelectionService for ServiceImpl {
 
         let path = projects_dir.join(format!("{}.{}", p.metadata.id, kind.extension()));
 
-        let bytes = match kind {
-            ProjectType::Json => {
-                json5::to_string(&p).map_err(to_pc_err)?.into_bytes()
+        let bytes = {
+            let loaders = get_loaders();
+            let mut v = Vec::new();
+            for loader in loaders {
+                if loader.kind() == kind {
+                    v = loader.store_project(&p).map_err(|e| ProjectSelectionServiceError::ProjectCreateError(format!("{e:}")))?;
+                    
+                }
             }
-            ProjectType::Binary => {
-                bson::to_vec(&p).map_err(to_pc_err)?
+            
+            if v.is_empty() {
+                return Err(ProjectSelectionServiceError::ProjectListError("No suitable loader found".into()));
             }
+            
+            v
         };
         tokio::fs::write(path, bytes).await.map_err(to_pc_err)?;
 
