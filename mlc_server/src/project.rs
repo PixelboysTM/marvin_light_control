@@ -7,10 +7,11 @@ use mlc_data::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use chrono::Local;
+use chrono::{Duration, Local};
 use log::{error, info};
 use tokio::io::AsyncReadExt;
-use mlc_data::project::ToFileName;
+use tokio::task::id;
+use mlc_data::project::{ProjectSettings, ToFileName};
 use crate::project::project_loader::get_loaders;
 
 mod project_loader;
@@ -20,6 +21,7 @@ pub struct Project {
     #[serde(flatten)]
     pub metadata: ProjectMetadata,
     pub blueprints: Vec<FixtureBlueprint>,
+    pub settings: ProjectSettings,
 }
 
 fn to_pl_err(e: tokio::io::Error) -> ProjectSelectionServiceError {
@@ -27,9 +29,8 @@ fn to_pl_err(e: tokio::io::Error) -> ProjectSelectionServiceError {
     ProjectSelectionServiceError::ProjectListError(format!("{e:?}"))
 }
 
-fn to_pc_err<E: std::error::Error>(e: E) -> ProjectSelectionServiceError {
-    error!("project create error: {:?}", e);
-    ProjectSelectionServiceError::ProjectCreateError(format!("{e:?}"))
+fn to_pc_err(e: String) -> ProjectSelectionServiceError {
+    ProjectSelectionServiceError::ProjectCreateError(e)
 }
 
 fn to_po_err<E: std::error::Error>(e: E) -> ProjectSelectionServiceError {
@@ -48,33 +49,35 @@ impl ProjectSelectionService for ServiceImpl {
         let mut p = create_default_project();
         p.metadata.name = name;
         p.metadata.created_at = Local::now();
-        p.metadata.last_saved = Local::now();
+        p.metadata.project_type = kind;
+
+        p.save().await.map_err(to_pc_err)?;
 
         let identifier = p.metadata.name.to_project_file_name();
-
-
-        let projects_dir = get_base_app_dir().join("projects");
-        tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pc_err)?;
-
-        let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
-
-        let bytes = {
-            let loaders = get_loaders();
-            let mut v = Vec::new();
-            for loader in loaders {
-                if loader.kind() == kind {
-                    v = loader.store_project(&p).map_err(|e| ProjectSelectionServiceError::ProjectCreateError(format!("{e:}")))?;
-                    
-                }
-            }
-            
-            if v.is_empty() {
-                return Err(ProjectSelectionServiceError::ProjectListError("No suitable loader found".into()));
-            }
-            
-            v
-        };
-        tokio::fs::write(path, bytes).await.map_err(to_pc_err)?;
+        //
+        //
+        // let projects_dir = get_base_app_dir().join("projects");
+        // tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pc_err)?;
+        //
+        // let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
+        //
+        // let bytes = {
+        //     let loaders = get_loaders();
+        //     let mut v = Vec::new();
+        //     for loader in loaders {
+        //         if loader.kind() == kind {
+        //             v = loader.store_project(&p).map_err(|e| ProjectSelectionServiceError::ProjectCreateError(format!("{e:}")))?;
+        //
+        //         }
+        //     }
+        //
+        //     if v.is_empty() {
+        //         return Err(ProjectSelectionServiceError::ProjectListError("No suitable loader found".into()));
+        //     }
+        //
+        //     v
+        // };
+        // tokio::fs::write(path, bytes).await.map_err(to_pc_err)?;
 
         Ok(identifier)
     }
@@ -156,15 +159,20 @@ impl ProjectSelectionService for ServiceImpl {
                 let mut bytes = Vec::<u8>::new();
                 content.read_to_end(&mut bytes).await.map_err(to_po_err)?;
 
-                let p: Project = match format {
+                let (mut p, k): (Project, ProjectType) = match format {
                     ProjectType::Json => {
-                        json5::from_str(&String::from_utf8(bytes).map_err(to_po_err)?).map_err(to_po_err)?
+                        (json5::from_str(&String::from_utf8(bytes).map_err(to_po_err)?).map_err(to_po_err)?, ProjectType::Json)
                     }
                     ProjectType::Binary => {
-                        bson::from_slice(&bytes).map_err(to_po_err)?
+                        (bson::from_slice(&bytes).map_err(to_po_err)?, ProjectType::Binary)
+                    }
+                    ProjectType::Invalid => {
+                        unreachable!()
                     }
                 };
 
+                p.metadata.name = ident;
+                p.metadata.project_type = k;
                 *self.project.write().await = p; //TODO: Adapt any other services that might need it effect baking endpoint mapping etc.
 
                 return Ok(true);
@@ -191,6 +199,10 @@ impl Project {
                 project_type: ProjectType::default(),
             },
             blueprints: vec![],
+            settings: ProjectSettings {
+                autosave: Some(Duration::minutes(30)),
+                save_on_quit: true,
+            }
         }
     }
 }
@@ -203,4 +215,43 @@ fn get_base_app_dir() -> PathBuf {
     let project_dirs = directories::ProjectDirs::from("de", "timfritzen", "marvin_light_control")
         .expect("Could not get project directory");
     project_dirs.data_dir().to_path_buf()
+}
+
+
+impl Project {
+    pub async fn save(&mut self) -> Result<(), String> {
+        let identifier = self.metadata.file_name.clone();
+        let kind = self.metadata.project_type.clone();
+
+        self.metadata.last_saved = Local::now();
+        self.metadata.file_name = "".to_owned();
+        self.metadata.project_type = ProjectType::Invalid;
+
+
+
+        let projects_dir = get_base_app_dir().join("projects");
+        tokio::fs::create_dir_all(&projects_dir).await.map_err(|e| format!("{e:?}"))?;
+
+        let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
+
+        let bytes = {
+            let loaders = get_loaders();
+            let mut v = Vec::new();
+            for loader in loaders {
+                if loader.kind() == kind {
+                    v = loader.store_project(self).map_err(|e| format!("{e:}"))?;
+
+                }
+            }
+
+            if v.is_empty() {
+                return Err("No suitable loader found".into());
+            }
+
+            v
+        };
+        tokio::fs::write(path, bytes).await.map_err(|e| format!("{e:?}"))?;
+
+        Ok(())
+    }
 }

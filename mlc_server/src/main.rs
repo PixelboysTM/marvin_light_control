@@ -10,7 +10,7 @@ use mlc_communication::services::general::{Alive, View};
 use mlc_communication::{self as com, remoc};
 use project::Project;
 use server::setup_server;
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tui::create_tui;
@@ -23,7 +23,7 @@ const DEFAULT_SERVER_PORT: u16 = 8181;
 
 pub struct ServiceImpl {
     project: Arc<RwLock<Project>>,
-    valid_project: Arc<RwLock<bool>>,
+    valid_project: RwLock<bool>,
     info_subscribers: Sender<Info>,
     status_subscribers: Sender<String>,
 }
@@ -68,10 +68,12 @@ async fn main() {
 
     let service_obj = Arc::new(RwLock::new(ServiceImpl {
         project,
-        valid_project: Arc::new(RwLock::new(false)),
-        info_subscribers: remoc::rch::watch::channel(Info::Idle).0,
-        status_subscribers: remoc::rch::watch::channel(String::new()).0,
+        valid_project: RwLock::new(false),
+        info_subscribers: rch::watch::channel(Info::Idle).0,
+        status_subscribers: rch::watch::channel(String::new()).0,
     }));
+
+    let adapt_notifier = Arc::new(Notify::new());
 
     let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
@@ -114,7 +116,7 @@ async fn create_shutdown_notifier(
     task_cancel_token: CancellationToken,
 ) {
     task_cancel_token.cancelled().await;
-    let _ = obj.read().await.send_info(Info::Shutdown);
+    obj.read().await.send_info(Info::Shutdown);
 }
 
 fn setup_logging() -> Result<(), fern::InitError> {

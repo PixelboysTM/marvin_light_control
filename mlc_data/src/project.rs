@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Duration, Local};
 use uuid::Uuid;
 
 
@@ -7,6 +7,7 @@ pub enum ProjectType {
     #[default]
     Json,
     Binary,
+    Invalid
 }
 
 impl ProjectType {
@@ -17,6 +18,7 @@ impl ProjectType {
         match self {
             ProjectType::Json => ".json",
             ProjectType::Binary => ".mbp",
+            ProjectType::Invalid => "."
         }
     }
 
@@ -80,4 +82,11 @@ pub struct ProjectMetadata {
     pub file_name: String,
     #[serde(default)]
     pub project_type: ProjectType,
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct ProjectSettings {
+    pub save_on_quit: bool,
+    pub autosave: Option<Duration>
 }
