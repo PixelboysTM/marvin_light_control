@@ -3215,6 +3215,7 @@ dependencies = [
  "chrono",
  "directories",
  "fern",
+ "futures",
  "json5",
  "log",
  "mlc_communication",

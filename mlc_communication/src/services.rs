@@ -22,6 +22,7 @@ pub mod general {
     pub enum Info {
         Idle,
         Shutdown,
+        Autosaved
     }
 
     #[rtc::remote]
@@ -38,7 +39,6 @@ pub mod project_selection {
     use serde::{Deserialize, Serialize};
     use crate::{ServiceIdentifiable, ServiceIdentifier};
     use mlc_data::project::{ProjectMetadata, ProjectType};
-    use mlc_data::uuid::Uuid;
 
     pub struct ProjectSelectionServiceIdent;
     impl ServiceIdentifiable for ProjectSelectionServiceIdent {

@@ -3,9 +3,7 @@ use crate::toaster::ToastInfo;
 use crate::utils::{navigate, Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Screen, Symbol};
 use dioxus::logger::tracing::{info, warn};
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{
-    LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash,
-};
+use dioxus_free_icons::icons::ld_icons::{LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash, LdTriangleAlert};
 use dioxus_free_icons::Icon;
 use mlc_communication::services::general::{
     GeneralService, GeneralServiceIdent, Info, View as GenView,
@@ -52,6 +50,9 @@ pub fn Project() -> Element {
                     Info::Shutdown => {
                         ToastInfo::info("Shutdown", "The backend shutdown!").post();
                         navigator().replace("/");
+                    }
+                    Info::Autosaved => {
+                        ToastInfo::info("Autosaved", "The backend autosaved").post();
                     }
                 }
             }
@@ -241,7 +242,9 @@ fn ProjectListItem(item: ProjectMetadata, onopen: EventHandler) -> Element {
                     ProjectType::Binary => rsx! {
                         Icon { icon: LdFileArchive, class: "fileType" }
                     },
-                }
+                    ProjectType::Invalid => rsx! {
+                        Icon { icon: LdTriangleAlert, class: "fileType" }}
+                    }
             }
 
             div { class: "actions",

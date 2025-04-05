@@ -1,5 +1,5 @@
-use chrono::{DateTime, Duration, Local};
-use uuid::Uuid;
+use std::time::Duration;
+use chrono::{DateTime, Local};
 
 
 #[derive(PartialEq, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]

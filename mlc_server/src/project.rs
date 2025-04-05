@@ -7,10 +7,10 @@ use mlc_data::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use chrono::{Duration, Local};
+use std::time::Duration;
+use chrono::Local;
 use log::{error, info};
 use tokio::io::AsyncReadExt;
-use tokio::task::id;
 use mlc_data::project::{ProjectSettings, ToFileName};
 use crate::project::project_loader::get_loaders;
 
@@ -50,10 +50,11 @@ impl ProjectSelectionService for ServiceImpl {
         p.metadata.name = name;
         p.metadata.created_at = Local::now();
         p.metadata.project_type = kind;
+        p.metadata.file_name =  p.metadata.name.to_project_file_name();
 
+        let identifier = p.metadata.file_name.clone();
         p.save().await.map_err(to_pc_err)?;
 
-        let identifier = p.metadata.name.to_project_file_name();
         //
         //
         // let projects_dir = get_base_app_dir().join("projects");
@@ -173,7 +174,11 @@ impl ProjectSelectionService for ServiceImpl {
 
                 p.metadata.name = ident;
                 p.metadata.project_type = k;
-                *self.project.write().await = p; //TODO: Adapt any other services that might need it effect baking endpoint mapping etc.
+                {
+                    *self.project.write().await = p;
+                    *self.valid_project.write().await = true;
+                }
+                self.adapt_notifier.notify_waiters();
 
                 return Ok(true);
             }
@@ -200,7 +205,7 @@ impl Project {
             },
             blueprints: vec![],
             settings: ProjectSettings {
-                autosave: Some(Duration::minutes(30)),
+                autosave: Some(Duration::from_secs(30 * 60)),
                 save_on_quit: true,
             }
         }
@@ -245,12 +250,16 @@ impl Project {
             }
 
             if v.is_empty() {
-                return Err("No suitable loader found".into());
+                return Err("No suitable saver found".into());
             }
 
             v
         };
         tokio::fs::write(path, bytes).await.map_err(|e| format!("{e:?}"))?;
+
+
+        self.metadata.file_name = identifier;
+        self.metadata.project_type = kind;
 
         Ok(())
     }

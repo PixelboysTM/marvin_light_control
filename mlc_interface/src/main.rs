@@ -8,6 +8,7 @@ use std::string::ToString;
 use toaster::{ToastInfo, ToasterProvider};
 use utils::{Loader};
 use screens::projects::Project;
+use crate::utils::{navigate, Screen};
 
 mod connect;
 mod toaster;
@@ -94,7 +95,8 @@ fn Connect() -> Element {
                         )
                             .post();
                         let nav = navigator();
-                        nav.replace("/projects");
+                        navigate(Screen::ProjectList);
+                        // nav.replace("/projects");
                     }
                 }
                 Err(e) => {
@@ -186,134 +188,3 @@ fn ProjectLayout() -> Element {
         footer { "footer" }
     }
 }
-// #[component]
-// pub fn Hero() -> Element {
-//     rsx! {
-//         div { id: "hero",
-//             img { src: HEADER_SVG, id: "header" }
-//             div { id: "links",
-//                 a { href: "https://dioxuslabs.com/learn/0.6/", "📚 Learn Dioxus" }
-//                 a { href: "https://dioxuslabs.com/awesome", "🚀 Awesome Dioxus" }
-//                 a { href: "https://github.com/dioxus-community/", "📡 Community Libraries" }
-//                 a { href: "https://github.com/DioxusLabs/sdk", "⚙️ Dioxus Development Kit" }
-//                 a { href: "https://marketplace.visualstudio.com/items?itemName=DioxusLabs.dioxus",
-//                     "💫 VSCode Extension"
-//                 }
-//                 a { href: "https://discord.gg/XgGxMSkvUM", "👋 Community Discord" }
-//             }
-//         }
-//     }
-// }
-
-// /// Home page
-// #[component]
-// fn Home() -> Element {
-//     // let c: Coroutine<String> = connect("http://localhost:8000/api/test", Callback::new(|rx: String| {
-//     //     warn!("Got response: {}", rx);
-//     // }));
-//     let e = use_resource(async || {
-//         let socket = TcpStream::connect((Ipv4Addr::LOCALHOST, 8181))
-//             .await
-//             .unwrap();
-
-//         let (socket_rx, mut socket_tx) = socket.into_split();
-//         socket_tx
-//             .write_all(&mlc_communication::ECHO_SERVICE_IDENT)
-//             .await
-//             .unwrap();
-
-//         let client: EchoServiceClient<remoc::codec::Bincode> =
-//             remoc::Connect::io(remoc::Cfg::default(), socket_rx, socket_tx)
-//                 .consume()
-//                 .await
-//                 .unwrap();
-
-//         client
-//     });
-
-//     let a = use_resource(async || {
-//         let socket = TcpStream::connect((Ipv4Addr::LOCALHOST, 8181))
-//             .await
-//             .unwrap();
-
-//         let (socket_rx, mut socket_tx) = socket.into_split();
-//         socket_tx
-//             .write_all(&mlc_communication::ANOTHER_SERVICE_IDENT)
-//             .await
-//             .unwrap();
-
-//         let client: AnotherServiceClient<remoc::codec::Bincode> =
-//             remoc::Connect::io(remoc::Cfg::default(), socket_rx, socket_tx)
-//                 .consume()
-//                 .await
-//                 .unwrap();
-
-//         client
-//     });
-//     rsx! {
-
-//         Hero {}
-//         button {
-//             onclick: move |_| async move {
-//                 warn!("Got button");
-//                 match &*e.read() {
-//                     Some(s) => {
-//                         let res = s.echo("Hello".to_string()).await;
-//                         info!("Got a result: {:?}", res);
-//                     }
-//                     None => {
-//                         warn!("Service not loaded");
-//                     }
-//                 }
-//             },
-//             {"Send".to_string()}
-//         }
-//         button {
-//             onclick: move |_| async move {
-//                 warn!("Got button");
-//                 match &*a.read() {
-//                     Some(s) => {
-//                         s.hello().await.unwrap();
-//                     }
-//                     None => {
-//                         warn!("Service not loaded");
-//                     }
-//                 }
-//             },
-//             {"Hello".to_string()}
-//         }
-//     }
-// }
-
-// /// Blog page
-// #[component]
-// pub fn Blog(id: i32) -> Element {
-//     rsx! {
-//         div { id: "blog",
-
-//             // Content
-//             h1 { "This is blog #{id}!" }
-//             p {
-//                 "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components."
-//             }
-
-//             // Navigation links
-//             Link { to: Route::Blog { id: id - 1 }, "Previous" }
-//             span { " <---> " }
-//             Link { to: Route::Blog { id: id + 1 }, "Next" }
-//         }
-//     }
-// }
-
-// /// Shared navbar component.
-// #[component]
-// fn Navbar() -> Element {
-//     rsx! {
-//         div { id: "navbar",
-//             Link { to: Route::Home {}, "Home" }
-//             Link { to: Route::Blog { id: 1 }, "Blog" }
-//         }
-
-//         Outlet::<Route> {}
-//     }
-// }

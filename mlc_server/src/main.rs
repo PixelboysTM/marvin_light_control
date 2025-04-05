@@ -1,6 +1,10 @@
+use std::net::Shutdown;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use log::{debug, error, info, trace, warn};
+use tokio::io::AsyncWriteExt;
+use tokio::select;
 use mlc_communication::remoc::prelude::*;
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
@@ -26,13 +30,14 @@ pub struct ServiceImpl {
     valid_project: RwLock<bool>,
     info_subscribers: Sender<Info>,
     status_subscribers: Sender<String>,
+    adapt_notifier: Arc<Notify>
 }
 pub type AServiceImpl = Arc<RwLock<ServiceImpl>>;
 
 impl ServiceImpl {
     pub fn send_info(&self, info: Info) {
         if let Err(err) = self.info_subscribers.send(info) {
-            eprintln!("SendInfo error: {err:#?}");
+            error!("SendInfo error: {err:#?}");
         }
     }
 }
@@ -65,15 +70,16 @@ async fn main() {
     setup_logging().unwrap();
 
     let project = Arc::new(RwLock::new(create_default_project()));
+    let adapt_notifier = Arc::new(Notify::new());
 
     let service_obj = Arc::new(RwLock::new(ServiceImpl {
         project,
         valid_project: RwLock::new(false),
         info_subscribers: rch::watch::channel(Info::Idle).0,
         status_subscribers: rch::watch::channel(String::new()).0,
+        adapt_notifier: adapt_notifier.clone()
     }));
 
-    let adapt_notifier = Arc::new(Notify::new());
 
     let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
@@ -87,6 +93,7 @@ async fn main() {
         service_obj.clone(),
         task_cancel_token.clone(),
     ));
+    task_handles.spawn(autosave_service(service_obj.clone(), adapt_notifier.clone(), task_cancel_token.clone()));
 
     let should_tui_exit = Arc::new(RwLock::new(false));
     let tui_handle = tokio::spawn(create_tui(
@@ -116,7 +123,13 @@ async fn create_shutdown_notifier(
     task_cancel_token: CancellationToken,
 ) {
     task_cancel_token.cancelled().await;
-    obj.read().await.send_info(Info::Shutdown);
+    let s = obj.write().await;
+
+    let mut p = s.project.write().await;
+    if *s.valid_project.read().await && p.settings.save_on_quit {
+        p.save().await.unwrap();
+    }
+    s.send_info(Info::Shutdown);
 }
 
 fn setup_logging() -> Result<(), fern::InitError> {
@@ -138,3 +151,41 @@ where
         self.push(tokio::spawn(s));
     }
 }
+
+
+async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>, shutdown: CancellationToken) {
+
+    fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
+        if valid {
+            if let Some(d) = &p.settings.autosave {
+                Box::pin(tokio::time::sleep(*d))
+            } else {
+                Box::pin(futures::future::pending())
+            }
+        } else {
+            Box::pin(futures::future::pending())
+        }
+    }
+
+    loop {
+        let duration = save_fut(&*service_obj.read().await.project.read().await, *service_obj.read().await.valid_project.read().await);
+
+        select! {
+            _ = adapt_notifier.notified() => {
+                continue;
+            }
+            _ = shutdown.cancelled() => {
+                break;
+            }
+            _ = duration => {
+                info!("Autosave triggered!");
+                let s = service_obj.write().await;
+                let _ = s.project.write().await.save().await.map_err(|e| error!("{e:?}"));
+                s.send_info(Info::Autosaved);
+            }
+        }
+
+        tokio::task::yield_now().await;
+    }
+}
+
