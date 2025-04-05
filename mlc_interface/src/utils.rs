@@ -34,11 +34,13 @@ pub fn Branding() -> Element {
 pub fn IconButton<I: IconShape + Clone + PartialEq + 'static>(
     icon: I,
     class: Option<String>,
+    style: Option<String>,
     onclick: Option<EventHandler<Event<MouseData>>>,
 ) -> Element {
     rsx! {
         button {
             class: format!("iconBtn {}", if let Some(c) = class {c} else { "".to_string() }),
+            style,
             onclick: move |v| {
                 if let Some(c) = onclick {
                     c.call(v);
@@ -136,12 +138,16 @@ pub fn Modal<
 
 pub enum Screen {
     ProjectList,
-    Configure
+    Configure,
+    Program,
+    Show
 }
 
 pub fn navigate(screen: Screen) {
     navigator().replace(match screen {
         Screen::ProjectList => {"/projects"}
         Screen::Configure => {"/project/configure"}
+        Screen::Program => {"/project/program"}
+        Screen::Show => {"/project/show"}
     }).map(|s| ToastInfo::error("Failed to change screen", s.0));
 }

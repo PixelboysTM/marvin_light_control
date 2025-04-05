@@ -2,13 +2,20 @@ use connect::connect_url;
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
-use mlc_communication::services::general::{GeneralService, GeneralServiceIdent};
+use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
 use std::net::Ipv4Addr;
 use std::string::ToString;
+use std::time::{Duration, Instant};
+use dioxus_free_icons::icons::ld_icons::{LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone};
+use log::{info, warn};
+use tokio::select;
+use tokio::time::sleep;
 use toaster::{ToastInfo, ToasterProvider};
 use utils::{Loader};
 use screens::projects::Project;
-use crate::utils::{navigate, Screen};
+use crate::connect::connect;
+use crate::utils::{navigate, Branding, IconButton, Screen};
+use mlc_communication::services::general::View as SView;
 
 mod connect;
 mod toaster;
@@ -180,11 +187,161 @@ fn View() -> Element {
     rsx! { "View" }
 }
 
+
+const PROJECT_COMMON: Asset = asset!("/assets/project_common.css");
 #[component]
 fn ProjectLayout() -> Element {
+    let mut delay = use_signal(|| 0);
+    let mut status_msg = use_signal(|| "Idling".to_string());
+
+    let gen_client = use_resource(connect::<GeneralServiceIdent>);
+    use_future(move || async move {
+        let mut needs_connect = true;
+
+        let mut info_sub = None;
+        let mut status_sub = None;
+
+        async fn recv<T: Clone>(sub: &mut Option<mlc_communication::remoc::rch::watch::Receiver<T>>) -> T {
+            match sub {
+                Some(sub) => {
+                    sub.changed().await.unwrap();
+                    sub.borrow_and_update().unwrap().clone()
+                }
+                None => {
+                    futures::future::pending().await
+                }
+            }
+        }
+
+        let mut counter = 0;
+        loop {
+            counter = (counter + 1) % 10;
+
+            select! {
+                i = recv(&mut info_sub) => {
+                    match i {
+                        Info::Autosaved => {
+                            ToastInfo::info("Autosaved", "The backend autosaved").post();
+                        }
+                        Info::Shutdown => {
+                            ToastInfo::info("Shutdown", "The backend shutdown!s").post();
+                            navigate(Screen::ProjectList);
+                        }
+                        Info::Idle => {}
+                    }
+                },
+                s = recv(&mut status_sub) => {
+                    status_msg.set(s);
+                },
+                _ = sleep(Duration::from_millis(50)) => {
+                    match &*gen_client.read() {
+                        None => {},
+                        Some(Err(e)) => {
+                            error!("Error occurred: {e:?}");
+                            return;
+                        }
+                        Some(Ok(c)) => {
+                            if needs_connect {
+                                needs_connect = false;
+
+                                let is_valid = c.is_valid_view(SView::Edit).await;
+                                if !matches!(is_valid, Ok(true)) {
+                                    navigate(Screen::ProjectList);
+                                }
+
+                                if let Ok(info) = c.info().await {
+                                    info_sub = Some(info);
+                                }
+
+                                if let Ok(s) = c.status().await {
+                                    status_sub = Some(s);
+                                }
+                            }
+
+                            if counter == 0 {
+                                let timer = Instant::now();
+                                let _ = c.alive().await;
+                                let t = timer.elapsed();
+                                *delay.write() = t.as_millis() as u64;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let r: Route = use_route();
+    let extra_actions = match r {
+        Route::Configure {} => rsx! {
+            IconButton {
+                icon: LdCloudUpload,
+                onclick: move |_| {
+                    info!("Open fixture adder");
+                }
+            }
+        },
+        Route::Program {} => rsx! {},
+        Route::Show {} => rsx! {
+            IconButton {
+                icon: LdTabletSmartphone,
+                onclick: move |_| {
+                    info!("Open mobile connector");
+                }
+            }
+        },
+        _ => {
+            warn!("Shouldn't be here");
+            rsx! {}
+        },
+    };
+
     rsx! {
-        header { "header" }
-        Outlet::<Route> {}
-        footer { "footer" }
+        div {
+            class: "projectContainer",
+            document::Stylesheet { href: PROJECT_COMMON }
+            nav {
+                Branding {}
+                div {
+                    class: "viewSelect",
+                    IconButton {
+                        class: if matches!(r, Route::Configure {}) {"curr"},
+                        style: "--c-cl: var(--c-p);",
+                        icon: LdCog,
+                        onclick: move |_| {
+                            navigate(Screen::Configure);
+                        }
+                    }
+                    IconButton {
+                        class: if matches!(r, Route::Program {}) {"curr"},
+                        style: "--c-cl: var(--c-s);",
+                        icon: LdPencil,
+                        onclick: move |_| {
+                            navigate(Screen::Program);
+                        }
+                    }
+                    IconButton {
+                        class: if matches!(r, Route::Show {}) {"curr"},
+                        style: "--c-cl: var(--c-t);",
+                        icon: LdLightbulb,
+                        onclick: move |_| {
+                            navigate(Screen::Show);
+                        }
+                    }
+                }
+                div { class: "actions",
+                    {extra_actions},
+                    IconButton {
+                        icon: LdSave,
+                        onclick: async |_| {
+                            info!("Saving");
+                            // CREATE_PROJECT.open().await;
+                        },
+                    }
+                }
+            }
+            Outlet::<Route> {}
+            footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read()) } }
+        }
     }
 }

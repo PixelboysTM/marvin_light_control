@@ -1,0 +1,48 @@
+.projectContainer {
+    width: 100%;
+    height: 100%;
+
+    display: grid;
+    grid-template-rows: 3rem 1fr 1.25rem;
+
+    nav {
+        background-color: var(--c-pnl);
+        width: 100vw;
+
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        align-items: center;
+
+        h1 {
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            font-size: 1.6rem;
+        }
+
+        .viewSelect {
+            display: flex;
+            align-items: center;
+            place-items: center;
+            width: fit-content;
+            margin: 0 auto;
+            --c-cl: var(--c-p);
+
+            .curr {
+                color: var(--c-cl);
+            }
+        }
+
+        .actions {
+            margin-right: 0.5rem;
+            display: flex;
+            width: fit-content;
+            margin-left: auto;
+        }
+    }
+
+    footer {
+        background-color: var(--c-pnl);
+        width: 100vw;
+    }
+}
