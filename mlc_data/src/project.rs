@@ -71,14 +71,13 @@ impl ToFileName for String {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ProjectMetadata {
     pub name: String,
-    pub id: Uuid,
     pub last_saved: DateTime<Local>,
     pub created_at: DateTime<Local>,
-    #[serde(skip)]
+    #[serde(default)]
     pub file_name: String,
-    #[serde(skip)]
+    #[serde(default)]
     pub project_type: ProjectType,
 }

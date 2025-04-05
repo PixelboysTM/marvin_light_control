@@ -21,5 +21,5 @@ pub async fn connect_url<I: ServiceIdentifiable>(
 }
 
 pub async fn connect<I: ServiceIdentifiable>() -> Result<I::Client, Box<dyn std::error::Error>> {
-    connect_url::<I>(CONNECT_URL.read().clone()).await
+    connect_url::<I>(*CONNECT_URL.read()).await
 }

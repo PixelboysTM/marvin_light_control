@@ -38,11 +38,9 @@ enum Route {
 const FAVICON: Asset = asset!("/assets/icon.png");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const UTILS_CSS: Asset = asset!("/assets/utils.css");
-// const HEADER_SVG: Asset = asset!("/assets/header.svg");
 
 fn main() {
-    // dioxus::launch(App);
-    dioxus::LaunchBuilder::new()
+    LaunchBuilder::new()
         .with_cfg(
             Config::default().with_menu(None).with_window(
                 WindowBuilder::new()
@@ -88,7 +86,7 @@ fn Connect() -> Element {
         if let (Ok(addr), Ok(port)) = (c.0.parse::<Ipv4Addr>(), c.1.parse::<u16>()) {
             match connect_url::<GeneralServiceIdent>((addr, port)).await {
                 Ok(client) => {
-                    if let Ok(_) = client.alive().await {
+                    if client.alive().await.is_ok() {
                         *CONNECT_URL.write() = (addr, port);
                         ToastInfo::info(
                             "Connection successful",

@@ -130,6 +130,7 @@ impl Widget for &TuiApp {
         let main_block = Block::bordered()
             .title(title.centered().bold())
             .border_set(border::ROUNDED)
+            .title_bottom(Line::from("Ctrl + C to exit".underlined()))
             .border_type(ratatui::widgets::BorderType::Thick);
         let a2 = main_block.inner(area);
         main_block.render(area, buf);
@@ -155,7 +156,6 @@ impl Widget for &TuiApp {
 
         let block = Block::bordered()
             .title("LOG")
-            .title_bottom(Line::from("Ctrl + C to exit".underlined()))
             .border_set(border::ROUNDED);
 
         tui_logger::TuiLoggerWidget::default()

@@ -1,21 +1,17 @@
 use crate::connect::connect;
 use crate::toaster::ToastInfo;
-use crate::utils::{Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Symbol};
-use chrono::{Days, Local};
-use dioxus::logger::tracing::{info, trace, warn};
+use crate::utils::{navigate, Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Screen, Symbol};
+use dioxus::logger::tracing::{info, warn};
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{
     LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash,
 };
 use dioxus_free_icons::Icon;
-use mlc_communication::remoc::rch::watch::ReceiverStream;
 use mlc_communication::services::general::{
     GeneralService, GeneralServiceIdent, Info, View as GenView,
 };
 use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
-use uuid::Uuid;
-use mlc_communication::services::project_selection::{ProjectSelectionService, ProjectSelectionServiceClient, ProjectSelectionServiceIdent};
-use crate::connect;
+use mlc_communication::services::project_selection::{ProjectIdent, ProjectSelectionService, ProjectSelectionServiceClient, ProjectSelectionServiceIdent};
 
 const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
@@ -62,16 +58,23 @@ pub fn Project() -> Element {
         }
     });
 
-    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented")).suspend()?;
-    let s2 = service.clone();
+    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented"));
 
-    let projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
+    let service_suspend = service.suspend()?;
+    let s2 = service_suspend.clone();
+    let s3 = service_suspend.clone();
+
+    let mut projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
         let s2 = s2.clone();
         async move {
-            s2.read().list().await.expect("Couldn't get projects")
+            let ps = s2.read().list().await.expect("Couldn't get projects");
+            println!("{:#?}", ps.iter().map(|p| &p.file_name).collect::<Vec<_>>());
+            ps
         }
-    })
-        .suspend()?;
+    });
+
+    let projects_suspend = projects.suspend()?;
+    let p2 = projects_suspend.clone();
 
     let mut new_project_name = use_signal(|| "New Project".to_string());
     let mut new_project_type = use_signal(|| ProjectType::Json);
@@ -109,7 +112,28 @@ pub fn Project() -> Element {
                     }
                 },
                 ProjectList {
-                    projects
+                    projects: projects_suspend,
+                    onopen: move |ident| {
+                        let s3 = s3.clone();
+                        async move {
+                            info!("Opening project: {:?}", ident);
+                            let r = s3.read().open(ident).await;
+                            match r {
+                                Ok(true) => {
+                                    ToastInfo::info("Loaded Project", "Project loading successful").post();
+                                    navigate(Screen::Configure);
+                                }
+                                Ok(false) => {
+                                    ToastInfo::info("Project not found", "Requested project could not be opened because it could not be located on disk!").post();
+                                    projects.restart();
+                                }
+                                Err(e) => {
+                                    ToastInfo::error("Failed to open project", e.to_string()).post();
+                                    projects.restart();
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -119,7 +143,7 @@ pub fn Project() -> Element {
                 icon: LdPlus,
                 variant: ModalVariant::OkCancel,
                 onexit: move |r| {
-                    let s2 = service.clone();
+                    let s2 = service_suspend.clone();
                     async move {
                     if r == ModalResult::Cancel {
                         return;
@@ -128,7 +152,7 @@ pub fn Project() -> Element {
                     let id = s2.read().create(new_project_name.read().clone(), new_project_type.read().clone()).await.expect("Couldn't create project");
                         let r = s2.read().open(id).await.expect("Couldn't open project");
                         if r {
-                            navigator().replace("/project/configure");
+                            navigate(Screen::Configure);
                         } else {
                             ToastInfo::warn("Project not found", "The given project could not be located!").post();
                         }
@@ -166,83 +190,73 @@ pub fn Project() -> Element {
     }
 }
 
-fn gen_projects(i: usize) -> Vec<ProjectMetadata> {
-    (0..i)
-        .map(|i| {
-            let name = format!("Project {}", i);
-            ProjectMetadata {
-                name: name.clone(),
-                file_name: name.to_project_file_name(),
-                project_type: if i % 2 == 0 {
-                    ProjectType::Binary
-                } else {
-                    ProjectType::Json
-                },
-                last_saved: Local::now(),
-                created_at: Local::now().checked_sub_days(Days::new(42)).unwrap(),
-                id: Uuid::nil(),
+#[component]
+fn ProjectList(projects: MappedSignal<Vec<ProjectMetadata>>, onopen: EventHandler<ProjectIdent>) -> Element {
+    rsx! {
+        div { class: "projectList",
+            for p in projects().into_iter() {
+                ProjectListItem {
+                    item: p.clone(),
+                    onopen: move |_| {
+                        onopen.call(p.file_name.clone());
+                    }
+                }
             }
-        })
-        .collect()
+        }
+    }
 }
 
 #[component]
-fn ProjectList(projects: MappedSignal<Vec<ProjectMetadata>>) -> Element {
+fn ProjectListItem(item: ProjectMetadata, onopen: EventHandler) -> Element {
+    rsx!{
+        div {
+            class: "project",
+            ondoubleclick: move |_| {
+                onopen.call(());
+            },
 
+            div { class: "info",
+                h1 { {item.name} }
+                p { class: "fileName", {item.file_name} }
 
-    rsx! {
-        div { class: "projectList",
-            for p in projects().iter() {
-                div {
-                    class: "project",
-                    ondoubleclick: move |_| {
-                        info!("Double clicked");
+                div { class: "details",
+                    p { class: "createdAt",
+                        Icon { icon: LdPencilRuler }
+                        {item.created_at.format("%d.%m.%y %H:%M").to_string()}
+                    }
+                    p { class: "lastSaved",
+                        Icon { icon: LdSave }
+                        {item.last_saved.format("%d.%m.%y %H:%M").to_string()}
+                    }
+                    p { class: "fixtureCount",
+                        Icon { icon: LdLightbulb }
+                        "Fixtures"
+                    }
+                }
+
+                match item.project_type {
+                    ProjectType::Json => rsx! {
+                        Icon { icon: LdFileJson, class: "fileType" }
                     },
+                    ProjectType::Binary => rsx! {
+                        Icon { icon: LdFileArchive, class: "fileType" }
+                    },
+                }
+            }
 
-                    div { class: "info",
-                        h1 { {p.name.clone()} }
-                        p { class: "fileName", {p.file_name.clone()} }
-
-                        div { class: "details",
-                            p { class: "createdAt",
-                                Icon { icon: LdPencilRuler }
-                                {p.created_at.format("%d.%m.%y %H:%M").to_string()}
-                            }
-                            p { class: "lastSaved",
-                                Icon { icon: LdSave }
-                                {p.last_saved.format("%d.%m.%y %H:%M").to_string()}
-                            }
-                            p { class: "fixtureCount",
-                                Icon { icon: LdLightbulb }
-                                "Fixtures"
-                            }
-                        }
-
-                        match p.project_type {
-                            ProjectType::Json => rsx! {
-                                Icon { icon: LdFileJson, class: "fileType" }
-                            },
-                            ProjectType::Binary => rsx! {
-                                Icon { icon: LdFileArchive, class: "fileType" }
-                            },
-                        }
-                    }
-
-                    div { class: "actions",
-                        IconButton {
-                            icon: LdPen,
-                            onclick: async |_| {
-                                info!("Opening");
-                            },
-                        }
-                        IconButton {
-                            icon: LdTrash,
-                            class: "delete",
-                            onclick: async |_| {
-                                info!("Deleting");
-                            },
-                        }
-                    }
+            div { class: "actions",
+                IconButton {
+                    icon: LdPen,
+                    onclick: move |_| {
+                        onopen.call(());
+                    },
+                }
+                IconButton {
+                    icon: LdTrash,
+                    class: "delete",
+                    onclick: async |_| {
+                        info!("Deleting");
+                    },
                 }
             }
         }

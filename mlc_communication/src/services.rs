@@ -46,12 +46,14 @@ pub mod project_selection {
         type Client = ProjectSelectionServiceClient;
     }
 
+    pub type ProjectIdent = String;
+
     #[rtc::remote]
     pub trait ProjectSelectionService {
-        async fn create(&self, name: String, kind: ProjectType) -> Result<Uuid, ProjectSelectionServiceError>;
+        async fn create(&self, name: String, kind: ProjectType) -> Result<ProjectIdent, ProjectSelectionServiceError>;
         async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError>;
-        async fn open(&self, id: Uuid) -> Result<bool, ProjectSelectionServiceError>;
-        async fn delete(&self, id: Uuid) -> Result<(), ProjectSelectionServiceError>;
+        async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError>;
+        async fn delete(&self, ident: ProjectIdent) -> Result<(), ProjectSelectionServiceError>;
     }
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize)]

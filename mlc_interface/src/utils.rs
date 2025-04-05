@@ -1,5 +1,6 @@
 use dioxus::{document::eval, prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
+use crate::toaster::ToastInfo;
 
 #[component]
 pub fn Loader() -> Element {
@@ -131,4 +132,16 @@ pub fn Modal<
             }
         }
     }
+}
+
+pub enum Screen {
+    ProjectList,
+    Configure
+}
+
+pub fn navigate(screen: Screen) {
+    navigator().replace(match screen {
+        Screen::ProjectList => {"/projects"}
+        Screen::Configure => {"/project/configure"}
+    }).map(|s| ToastInfo::error("Failed to change screen", s.0));
 }

@@ -1,19 +1,16 @@
 use crate::ServiceImpl;
 use mlc_communication::remoc::rtc;
-use mlc_communication::remoc::rtc::CallError;
-use mlc_communication::services::project_selection::{
-    ProjectSelectionService, ProjectSelectionServiceError,
-};
-use mlc_data::uuid::Uuid;
+use mlc_communication::services::project_selection::{ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError};
 use mlc_data::{
     fixture::blueprint::FixtureBlueprint,
     project::{ProjectMetadata, ProjectType},
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use chrono::{Local, Utc};
-use log::error;
+use chrono::Local;
+use log::{error, info};
 use tokio::io::AsyncReadExt;
+use mlc_data::project::ToFileName;
 use crate::project::project_loader::get_loaders;
 
 mod project_loader;
@@ -46,18 +43,20 @@ impl ProjectSelectionService for ServiceImpl {
         &self,
         name: String,
         kind: ProjectType,
-    ) -> Result<Uuid, ProjectSelectionServiceError> {
+    ) -> Result<ProjectIdent, ProjectSelectionServiceError> {
 
         let mut p = create_default_project();
         p.metadata.name = name;
         p.metadata.created_at = Local::now();
         p.metadata.last_saved = Local::now();
 
+        let identifier = p.metadata.name.to_project_file_name();
+
 
         let projects_dir = get_base_app_dir().join("projects");
         tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pc_err)?;
 
-        let path = projects_dir.join(format!("{}.{}", p.metadata.id, kind.extension()));
+        let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
 
         let bytes = {
             let loaders = get_loaders();
@@ -77,7 +76,7 @@ impl ProjectSelectionService for ServiceImpl {
         };
         tokio::fs::write(path, bytes).await.map_err(to_pc_err)?;
 
-        Ok(p.metadata.id)
+        Ok(identifier)
     }
 
     async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError> {
@@ -129,7 +128,7 @@ impl ProjectSelectionService for ServiceImpl {
                                 continue;
                             };
 
-                            meta.file_name = file_name.to_string();
+                            meta.file_name = file_name.split('.').next().expect("Must be").to_string();
                             projects.push(meta);
                         }
                     } else {
@@ -145,11 +144,11 @@ impl ProjectSelectionService for ServiceImpl {
         Ok(projects)
     }
 
-    async fn open(&self, id: Uuid) -> Result<bool, ProjectSelectionServiceError> {
+    async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError> {
         let projects_dir = get_base_app_dir().join("projects");
 
         for format in ProjectType::all() {
-            let path = projects_dir.join(format!("{id}.{}", format.extension()));
+            let path = projects_dir.join(format!("{ident}.{}", format.extension()));
             if path.exists() && path.is_file() {
                 let mut content = tokio::fs::File::open(path)
                     .await
@@ -172,11 +171,12 @@ impl ProjectSelectionService for ServiceImpl {
             }
         }
 
+        info!("Project with ident: {ident} not found");
         Ok(false)
     }
 
-    async fn delete(&self, id: Uuid) -> Result<(), ProjectSelectionServiceError> {
-        todo!()
+    async fn delete(&self, _ident: ProjectIdent) -> Result<(), ProjectSelectionServiceError> {
+        unimplemented!()
     }
 }
 
@@ -185,11 +185,10 @@ impl Project {
         Self {
             metadata: ProjectMetadata {
                 name: "Default invalid project".into(),
-                last_saved: chrono::Local::now(),
-                created_at: chrono::Local::now(),
+                last_saved: Local::now(),
+                created_at: Local::now(),
                 file_name: "".into(),
                 project_type: ProjectType::default(),
-                id: Uuid::new_v4(),
             },
             blueprints: vec![],
         }
