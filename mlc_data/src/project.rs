@@ -7,6 +7,7 @@ pub enum ProjectType {
     #[default]
     Json,
     Binary,
+    #[serde(rename = "Omitted")]
     Invalid
 }
 
@@ -14,7 +15,7 @@ impl ProjectType {
     pub fn extension(&self) -> &'static str {
         &self.dotted_extension()[1..]
     }
-    pub fn dotted_extension(&self) -> &'static str {
+    pub const fn dotted_extension(&self) -> &'static str {
         match self {
             ProjectType::Json => ".json",
             ProjectType::Binary => ".mbp",

@@ -1,18 +1,15 @@
 use crate::ServiceImpl;
 use mlc_communication::remoc::rtc;
 use mlc_communication::services::project_selection::{ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError};
-use mlc_data::{
-    fixture::blueprint::FixtureBlueprint,
-    project::{ProjectMetadata, ProjectType},
-};
+use mlc_data::{fixture::blueprint::FixtureBlueprint, project::{ProjectMetadata, ProjectType}, DynamicResult};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use chrono::Local;
-use log::{error, info};
+use log::{error, info, warn};
 use tokio::io::AsyncReadExt;
 use mlc_data::project::{ProjectSettings, ToFileName};
-use crate::project::project_loader::get_loaders;
+use crate::project::project_loader::Plm;
 
 mod project_loader;
 
@@ -55,31 +52,6 @@ impl ProjectSelectionService for ServiceImpl {
         let identifier = p.metadata.file_name.clone();
         p.save().await.map_err(to_pc_err)?;
 
-        //
-        //
-        // let projects_dir = get_base_app_dir().join("projects");
-        // tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pc_err)?;
-        //
-        // let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
-        //
-        // let bytes = {
-        //     let loaders = get_loaders();
-        //     let mut v = Vec::new();
-        //     for loader in loaders {
-        //         if loader.kind() == kind {
-        //             v = loader.store_project(&p).map_err(|e| ProjectSelectionServiceError::ProjectCreateError(format!("{e:}")))?;
-        //
-        //         }
-        //     }
-        //
-        //     if v.is_empty() {
-        //         return Err(ProjectSelectionServiceError::ProjectListError("No suitable loader found".into()));
-        //     }
-        //
-        //     v
-        // };
-        // tokio::fs::write(path, bytes).await.map_err(to_pc_err)?;
-
         Ok(identifier)
     }
 
@@ -103,37 +75,53 @@ impl ProjectSelectionService for ServiceImpl {
                     if let Some(file) = files.next_entry().await.map_err(to_pl_err)? {
                         let file_name = file.file_name().to_string_lossy().to_string();
                         if file.file_type().await.map_err(to_pl_err)?.is_file() {
-                            let mut content = tokio::fs::File::open(file.path())
-                                .await
-                                .map_err(to_pl_err)?;
-                            let mut meta: ProjectMetadata = if file_name
-                                .ends_with(ProjectType::Json.dotted_extension())
-                            {
-                                let mut s = String::new();
-                                content.read_to_string(&mut s).await.map_err(to_pl_err)?;
-                                let mut m: ProjectMetadata = json5::from_str(&s).map_err(|e| {
-                                    ProjectSelectionServiceError::ProjectListError(format!(
-                                        "Couldn't read Metadata {e}"
-                                    ))
-                                })?;
-                                m.project_type = ProjectType::Json;
-                                m
-                            } else if file_name.ends_with(ProjectType::Binary.dotted_extension()) {
-                                let mut buffer = Vec::new();
-                                content.read_to_end(&mut buffer).await.map_err(to_pl_err)?;
-                                let mut m: ProjectMetadata = bson::from_slice(&buffer).map_err(|e| {
-                                    ProjectSelectionServiceError::ProjectListError(format!(
-                                        "Couldn't read Binary Metadata {e:}"
-                                    ))
-                                })?;
-                                m.project_type = ProjectType::Binary;
-                                m
+                            if let Some(loader) = Plm::for_file(&file.path()) {
+                                let data = tokio::fs::read(file.path()).await.map_err(to_pl_err)?;
+                                let meta = loader.load_metadata(data);
+                                match meta {
+                                    Ok(mut meta) => {
+                                        meta.project_type = loader.kind();
+                                        meta.file_name = file_name.split('.').next().expect("Must be").to_string();
+                                        projects.push(meta);
+                                    }
+                                    Err(e) => {
+                                        warn!("Error loading project metadata: {}", e);
+                                    }
+                                }
                             } else {
-                                continue;
-                            };
+                                warn!("No suitable loader found for: {file_name}");
+                            }
 
-                            meta.file_name = file_name.split('.').next().expect("Must be").to_string();
-                            projects.push(meta);
+                            // let mut content = tokio::fs::File::open(file.path())
+                            //     .await
+                            //     .map_err(to_pl_err)?;
+                            // let mut meta: ProjectMetadata = if file_name
+                            //     .ends_with(ProjectType::Json.dotted_extension())
+                            // {
+                            //     let mut s = String::new();
+                            //     content.read_to_string(&mut s).await.map_err(to_pl_err)?;
+                            //     let mut m: ProjectMetadata = json5::from_str(&s).map_err(|e| {
+                            //         ProjectSelectionServiceError::ProjectListError(format!(
+                            //             "Couldn't read Metadata {e}"
+                            //         ))
+                            //     })?;
+                            //     m.project_type = ProjectType::Json;
+                            //     m
+                            // } else if file_name.ends_with(ProjectType::Binary.dotted_extension()) {
+                            //     let mut buffer = Vec::new();
+                            //     content.read_to_end(&mut buffer).await.map_err(to_pl_err)?;
+                            //     let mut m: ProjectMetadata = bson::from_slice(&buffer).map_err(|e| {
+                            //         ProjectSelectionServiceError::ProjectListError(format!(
+                            //             "Couldn't read Binary Metadata {e:}"
+                            //         ))
+                            //     })?;
+                            //     m.project_type = ProjectType::Binary;
+                            //     m
+                            // } else {
+                            //     continue;
+                            // };
+
+
                         }
                     } else {
                         break 'file_iter;
@@ -151,35 +139,21 @@ impl ProjectSelectionService for ServiceImpl {
     async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError> {
         let projects_dir = get_base_app_dir().join("projects");
 
-        for format in ProjectType::all() {
-            let path = projects_dir.join(format!("{ident}.{}", format.extension()));
+
+        for loader in Plm::loaders() {
+            let path = projects_dir.join(format!("{}.{}", &ident, loader.kind().extension()));
             if path.exists() && path.is_file() {
-                let mut content = tokio::fs::File::open(path)
-                    .await
-                    .map_err(to_po_err)?;
-                let mut bytes = Vec::<u8>::new();
-                content.read_to_end(&mut bytes).await.map_err(to_po_err)?;
+                let content = tokio::fs::read(path).await.map_err(to_po_err)?;
+                let mut p = loader.load_project(content).map_err(|e| ProjectSelectionServiceError::ProjectOpenError(format!("{e:?}")))?;
 
-                let (mut p, k): (Project, ProjectType) = match format {
-                    ProjectType::Json => {
-                        (json5::from_str(&String::from_utf8(bytes).map_err(to_po_err)?).map_err(to_po_err)?, ProjectType::Json)
-                    }
-                    ProjectType::Binary => {
-                        (bson::from_slice(&bytes).map_err(to_po_err)?, ProjectType::Binary)
-                    }
-                    ProjectType::Invalid => {
-                        unreachable!()
-                    }
-                };
+                p.metadata.project_type = loader.kind();
+                p.metadata.file_name = ident.clone();
 
-                p.metadata.name = ident;
-                p.metadata.project_type = k;
                 {
                     *self.project.write().await = p;
                     *self.valid_project.write().await = true;
                 }
                 self.adapt_notifier.notify_waiters();
-
                 return Ok(true);
             }
         }
@@ -239,23 +213,28 @@ impl Project {
 
         let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
 
-        let bytes = {
-            let loaders = get_loaders();
-            let mut v = Vec::new();
-            for loader in loaders {
-                if loader.kind() == kind {
-                    v = loader.store_project(self).map_err(|e| format!("{e:}"))?;
 
-                }
-            }
+        let loader = Plm::for_kind(&kind).ok_or(format!("No saver found for {kind:?}"))?;
+        let data = loader.store_project(self).map_err(|e| format!("{e:}"))?;
+        tokio::fs::write(path, data).await.map_err(|e| format!("{e:?}"))?;
 
-            if v.is_empty() {
-                return Err("No suitable saver found".into());
-            }
 
-            v
-        };
-        tokio::fs::write(path, bytes).await.map_err(|e| format!("{e:?}"))?;
+        // let bytes = {
+        //     let loaders = Plm::loaders();
+        //     let mut v = Vec::new();
+        //     for loader in loaders {
+        //         if loader.kind() == kind {
+        //             v = loader.store_project(self).map_err(|e| format!("{e:}"))?;
+        //
+        //         }
+        //     }
+        //
+        //     if v.is_empty() {
+        //         return Err("No suitable saver found".into());
+        //     }
+        //
+        //     v
+        // };
 
 
         self.metadata.file_name = identifier;

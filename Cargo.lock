@@ -3217,6 +3217,7 @@ dependencies = [
  "fern",
  "futures",
  "json5",
+ "lazy_static",
  "log",
  "mlc_communication",
  "mlc_data",
