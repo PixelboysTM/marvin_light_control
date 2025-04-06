@@ -1,4 +1,5 @@
 use dioxus::{document::eval, prelude::*};
+use dioxus::desktop::use_window;
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
 use crate::toaster::ToastInfo;
 
@@ -152,4 +153,13 @@ pub fn navigate(screen: Screen) {
         Screen::Program => {"/project/program"}
         Screen::Show => {"/project/show"}
     }).map(|s| ToastInfo::error("Failed to change screen", s.0));
+
+
+    use_window().window.set_title(match screen {
+        Screen::Connect => "Marvin Light Control",
+        Screen::ProjectList => "Marvin Light Control | Project Selection",
+        Screen::Configure => "Marvin Light Control | Configure",
+        Screen::Program => "Marvin Light Control | Program",
+        Screen::Show => "Marvin Light Control | Show",
+    });
 }

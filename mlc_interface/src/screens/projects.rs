@@ -27,7 +27,8 @@ pub fn Project() -> Element {
 
         let c = res.expect("Must be");
         if let Ok(false) = c.is_valid_view(GenView::Project).await {
-            navigator().replace("/project/configure");
+            // navigator().replace("/project/configure");
+            navigate(Screen::Configure)
         }
 
         c

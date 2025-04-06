@@ -101,7 +101,6 @@ fn Connect() -> Element {
                             "Connection to the backend could be established.",
                         )
                             .post();
-                        let nav = navigator();
                         navigate(Screen::ProjectList);
                         // nav.replace("/projects");
                     }
