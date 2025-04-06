@@ -137,6 +137,7 @@ pub fn Modal<
 }
 
 pub enum Screen {
+    Connect,
     ProjectList,
     Configure,
     Program,
@@ -145,6 +146,7 @@ pub enum Screen {
 
 pub fn navigate(screen: Screen) {
     navigator().replace(match screen {
+        Screen::Connect => "/",
         Screen::ProjectList => {"/projects"}
         Screen::Configure => {"/project/configure"}
         Screen::Program => {"/project/program"}

@@ -128,9 +128,9 @@ fn Connect() -> Element {
     use_future(connect_handler);
 
     rsx! {
+        document::Stylesheet { href: CONNECT_CSS }
         match loading() {
             false => rsx! {
-                document::Stylesheet { href: CONNECT_CSS }
                 fieldset { class: "connect",
                     legend { "Connection Address:" }
                     input {
@@ -225,7 +225,7 @@ fn ProjectLayout() -> Element {
                         }
                         Info::Shutdown => {
                             ToastInfo::info("Shutdown", "The backend shutdown!s").post();
-                            navigate(Screen::ProjectList);
+                            navigate(Screen::Connect);
                         }
                         Info::Idle => {}
                     }

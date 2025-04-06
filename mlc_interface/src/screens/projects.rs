@@ -5,6 +5,7 @@ use dioxus::logger::tracing::{info, warn};
 use dioxus::prelude::*;
 use dioxus_free_icons::icons::ld_icons::{LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash, LdTriangleAlert};
 use dioxus_free_icons::Icon;
+use log::error;
 use mlc_communication::services::general::{
     GeneralService, GeneralServiceIdent, Info, View as GenView,
 };
@@ -19,8 +20,10 @@ pub fn Project() -> Element {
     let m_client = use_resource(async || {
         let res = connect::<GeneralServiceIdent>().await;
         if res.is_err() {
-            navigator().replace("/");
+            navigate(Screen::Connect)
         }
+
+        error!("GOT HERE");
 
         let c = res.expect("Must be");
         if let Ok(false) = c.is_valid_view(GenView::Project).await {
