@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 use chrono::Local;
 use log::{error, info, warn};
-use tokio::io::AsyncReadExt;
 use mlc_data::project::{ProjectSettings, ToFileName};
 use crate::project::project_loader::Plm;
 
@@ -35,6 +34,38 @@ fn to_po_err<E: std::error::Error>(e: E) -> ProjectSelectionServiceError {
     ProjectSelectionServiceError::ProjectOpenError(format!("{e:?}"))
 }
 
+async fn get_valid_project_dir() -> DynamicResult<PathBuf> {
+    let projects_dir = get_base_app_dir().join("projects");
+    tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pl_err)?;
+    Ok(projects_dir)
+}
+
+async fn make_save_file_name(name: &str, kind: &ProjectType) -> DynamicResult<String> {
+    let projects_dir = get_valid_project_dir().await?;
+
+    let base = name.to_project_file_name();
+
+    fn complete(name: &str, kind: &ProjectType) -> String {
+        format!("{}.{}", name, kind.extension())
+    }
+
+    if !projects_dir.join(complete(&base, kind)).exists() {
+        return Ok(base);
+    }
+
+    for i in 0.. {
+        let indexed = format!("{base}_{i}");
+
+        if projects_dir.join(complete(&indexed, kind)).exists() {
+            continue;
+        }
+
+        return Ok(indexed);
+    }
+
+    Err(format!("Could not create save file name for name: {name}").into())
+}
+
 #[rtc::async_trait]
 impl ProjectSelectionService for ServiceImpl {
     async fn create(
@@ -47,7 +78,7 @@ impl ProjectSelectionService for ServiceImpl {
         p.metadata.name = name;
         p.metadata.created_at = Local::now();
         p.metadata.project_type = kind;
-        p.metadata.file_name =  p.metadata.name.to_project_file_name();
+        p.metadata.file_name =  make_save_file_name(&p.metadata.name, &kind).await.map_err(|e| ProjectSelectionServiceError::ProjectCreateError(e.to_string()))?;
 
         let identifier = p.metadata.file_name.clone();
         p.save().await.map_err(to_pc_err)?;
@@ -58,8 +89,7 @@ impl ProjectSelectionService for ServiceImpl {
     async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError> {
         let mut projects = vec![];
 
-        let projects_dir = get_base_app_dir().join("projects");
-        tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pl_err)?;
+        let projects_dir = get_valid_project_dir().await.map_err(|e| ProjectSelectionServiceError::ProjectListError(e.to_string()))?;
 
         match projects_dir.canonicalize() {
             Ok(path) => {
@@ -91,37 +121,6 @@ impl ProjectSelectionService for ServiceImpl {
                             } else {
                                 warn!("No suitable loader found for: {file_name}");
                             }
-
-                            // let mut content = tokio::fs::File::open(file.path())
-                            //     .await
-                            //     .map_err(to_pl_err)?;
-                            // let mut meta: ProjectMetadata = if file_name
-                            //     .ends_with(ProjectType::Json.dotted_extension())
-                            // {
-                            //     let mut s = String::new();
-                            //     content.read_to_string(&mut s).await.map_err(to_pl_err)?;
-                            //     let mut m: ProjectMetadata = json5::from_str(&s).map_err(|e| {
-                            //         ProjectSelectionServiceError::ProjectListError(format!(
-                            //             "Couldn't read Metadata {e}"
-                            //         ))
-                            //     })?;
-                            //     m.project_type = ProjectType::Json;
-                            //     m
-                            // } else if file_name.ends_with(ProjectType::Binary.dotted_extension()) {
-                            //     let mut buffer = Vec::new();
-                            //     content.read_to_end(&mut buffer).await.map_err(to_pl_err)?;
-                            //     let mut m: ProjectMetadata = bson::from_slice(&buffer).map_err(|e| {
-                            //         ProjectSelectionServiceError::ProjectListError(format!(
-                            //             "Couldn't read Binary Metadata {e:}"
-                            //         ))
-                            //     })?;
-                            //     m.project_type = ProjectType::Binary;
-                            //     m
-                            // } else {
-                            //     continue;
-                            // };
-
-
                         }
                     } else {
                         break 'file_iter;
@@ -137,7 +136,7 @@ impl ProjectSelectionService for ServiceImpl {
     }
 
     async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError> {
-        let projects_dir = get_base_app_dir().join("projects");
+        let projects_dir = get_valid_project_dir().await.map_err(|e| ProjectSelectionServiceError::ProjectOpenError(e.to_string()))?;
 
 
         for loader in Plm::loaders() {
@@ -208,8 +207,7 @@ impl Project {
 
 
 
-        let projects_dir = get_base_app_dir().join("projects");
-        tokio::fs::create_dir_all(&projects_dir).await.map_err(|e| format!("{e:?}"))?;
+        let projects_dir = get_valid_project_dir().await.map_err(|e| e.to_string())?;
 
         let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
 
@@ -217,24 +215,6 @@ impl Project {
         let loader = Plm::for_kind(&kind).ok_or(format!("No saver found for {kind:?}"))?;
         let data = loader.store_project(self).map_err(|e| format!("{e:}"))?;
         tokio::fs::write(path, data).await.map_err(|e| format!("{e:?}"))?;
-
-
-        // let bytes = {
-        //     let loaders = Plm::loaders();
-        //     let mut v = Vec::new();
-        //     for loader in loaders {
-        //         if loader.kind() == kind {
-        //             v = loader.store_project(self).map_err(|e| format!("{e:}"))?;
-        //
-        //         }
-        //     }
-        //
-        //     if v.is_empty() {
-        //         return Err("No suitable saver found".into());
-        //     }
-        //
-        //     v
-        // };
 
 
         self.metadata.file_name = identifier;

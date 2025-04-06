@@ -2,7 +2,7 @@ use std::time::Duration;
 use chrono::{DateTime, Local};
 
 
-#[derive(PartialEq, Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+#[derive(PartialEq, Debug, Clone, Copy, serde::Serialize, serde::Deserialize, Default)]
 pub enum ProjectType {
     #[default]
     Json,
