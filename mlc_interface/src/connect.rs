@@ -1,12 +1,10 @@
 use dioxus::hooks::use_signal;
+use dioxus::prelude::*;
 use dioxus::signals::{Readable, Signal};
-use dioxus::{prelude::*, CapturedError};
 use mlc_communication::remoc::ConnectExt;
 use mlc_communication::{remoc, ServiceIdentifiable};
-use std::cell::Cell;
 use std::net::Ipv4Addr;
 use std::ops::Deref;
-use std::rc::{self, Rc};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 

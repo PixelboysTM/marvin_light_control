@@ -1,4 +1,3 @@
-use crate::connect::connect;
 use crate::utils::{navigate, Branding, IconButton, Screen};
 use connect::{connect_url, use_service};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
@@ -18,7 +17,6 @@ use std::{
 };
 use toaster::{ToastInfo, ToasterProvider};
 use tokio::select;
-use tokio::time::sleep;
 use utils::Loader;
 
 mod connect;
@@ -189,7 +187,6 @@ fn ProjectLayout() -> Element {
     })
     .suspend()?;
 
-    // let gen_client = use_resource(connect::<GeneralServiceIdent>);
     use_future(move || async move {
         let mut info_sub = if let Ok(info) = gen_client().info().await {
             info
@@ -226,80 +223,6 @@ fn ProjectLayout() -> Element {
                 }
             }
         }
-
-        // let mut needs_connect = true;
-
-        // let mut info_sub = None;
-        // let mut status_sub = None;
-
-        // async fn recv<T: Clone>(
-        //     sub: &mut Option<mlc_communication::remoc::rch::watch::Receiver<T>>,
-        // ) -> T {
-        //     match sub {
-        //         Some(sub) => {
-        //             sub.changed().await.unwrap();
-        //             sub.borrow_and_update().unwrap().clone()
-        //         }
-        //         None => futures::future::pending().await,
-        //     }
-        // }
-
-        // let mut counter = 0;
-        // loop {
-        //     counter = (counter + 1) % 10;
-
-        //     select! {
-        //         i = recv(&mut info_sub) => {
-        //             match i {
-        //                 Info::Autosaved => {
-        //                     ToastInfo::info("Autosaved", "The backend autosaved").post();
-        //                 }
-        //                 Info::Shutdown => {
-        //                     ToastInfo::info("Shutdown", "The backend shutdown!s").post();
-        //                     navigate(Screen::Connect);
-        //                 }
-        //                 Info::Idle => {}
-        //             }
-        //         },
-        //         s = recv(&mut status_sub) => {
-        //             status_msg.set(s);
-        //         },
-        //         _ = sleep(Duration::from_millis(50)) => {
-        //             match &*gen_client.read() {
-        //                 None => {},
-        //                 Some(Err(e)) => {
-        //                     error!("Error occurred: {e:?}");
-        //                     return;
-        //                 }
-        //                 Some(Ok(c)) => {
-        //                     if needs_connect {
-        //                         needs_connect = false;
-
-        //                         let is_valid = c.is_valid_view(SView::Edit).await;
-        //                         if !matches!(is_valid, Ok(true)) {
-        //                             navigate(Screen::ProjectList);
-        //                         }
-
-        //                         if let Ok(info) = c.info().await {
-        //                             info_sub = Some(info);
-        //                         }
-
-        //                         if let Ok(s) = c.status().await {
-        //                             status_sub = Some(s);
-        //                         }
-        //                     }
-
-        //                     if counter == 0 {
-        //                         let timer = Instant::now();
-        //                         let _ = c.alive().await;
-        //                         let t = timer.elapsed();
-        //                         *delay.write() = t.as_millis() as u64;
-        //                     }
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
     });
 
     use_future(move || async move {
