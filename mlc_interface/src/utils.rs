@@ -1,7 +1,10 @@
-use dioxus::{document::eval, prelude::*};
-use dioxus::desktop::use_window;
-use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
+use std::ops::{Deref, DerefMut};
+
 use crate::toaster::ToastInfo;
+use dioxus::desktop::use_window;
+use dioxus::{document::eval, prelude::*};
+use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
+use uuid::Uuid;
 
 #[component]
 pub fn Loader() -> Element {
@@ -40,7 +43,7 @@ pub fn IconButton<I: IconShape + Clone + PartialEq + 'static>(
 ) -> Element {
     rsx! {
         button {
-            class: format!("iconBtn {}", if let Some(c) = class {c} else { "".to_string() }),
+            class: format!("iconBtn {}", if let Some(c) = class { c } else { "".to_string() }),
             style,
             onclick: move |v| {
                 if let Some(c) = onclick {
@@ -142,18 +145,19 @@ pub enum Screen {
     ProjectList,
     Configure,
     Program,
-    Show
+    Show,
 }
 
 pub fn navigate(screen: Screen) {
-    navigator().replace(match screen {
-        Screen::Connect => "/",
-        Screen::ProjectList => {"/projects"}
-        Screen::Configure => {"/project/configure"}
-        Screen::Program => {"/project/program"}
-        Screen::Show => {"/project/show"}
-    }).map(|s| ToastInfo::error("Failed to change screen", s.0));
-
+    navigator()
+        .replace(match screen {
+            Screen::Connect => "/",
+            Screen::ProjectList => "/projects",
+            Screen::Configure => "/project/configure",
+            Screen::Program => "/project/program",
+            Screen::Show => "/project/show",
+        })
+        .map(|s| ToastInfo::error("Failed to change screen", s.0));
 
     use_window().window.set_title(match screen {
         Screen::Connect => "Marvin Light Control",
@@ -165,18 +169,70 @@ pub fn navigate(screen: Screen) {
 }
 
 #[component]
-pub fn Panel(children: Option<Element>, column: String, row: String, title: Option<String>) -> Element {
-    rsx!{
-        div{
+pub fn Panel(
+    children: Option<Element>,
+    column: String,
+    row: String,
+    title: Option<String>,
+) -> Element {
+    rsx! {
+        div {
             class: "panel",
-            style: format!("grid-column: {column}; grid-row: {row}",),
+            style: format!("grid-column: {column}; grid-row: {row}"),
             if let Some(title) = title {
-                h1 {
-                    class: "title",
-                    {title}
-                }
+                h1 { class: "title", {title} }
             }
-            {children}
+            SuspenseBoundary {
+                fallback: move |_| {
+                    rsx! {
+                        Loader {}
+                    }
+                },
+                {children}
+            }
+        }
+    }
+}
+
+pub struct UniqueEq<T> {
+    value: T,
+    id: Uuid,
+}
+
+impl<T: Clone> Clone for UniqueEq<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            id: self.id.clone(),
+        }
+    }
+}
+
+impl<T> PartialEq for UniqueEq<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl<T> Deref for UniqueEq<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for UniqueEq<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T> From<T> for UniqueEq<T> {
+    fn from(value: T) -> Self {
+        UniqueEq {
+            value,
+            id: Uuid::new_v4(),
         }
     }
 }

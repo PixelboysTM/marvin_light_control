@@ -1,23 +1,25 @@
-use connect::connect_url;
+use crate::connect::connect;
+use crate::utils::{navigate, Branding, IconButton, Screen};
+use connect::{connect_url, use_service};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
+use dioxus_free_icons::icons::ld_icons::{
+    LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
+};
+use log::{info, warn};
+use mlc_communication::services::general::View as SView;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
+use screens::{Configure, Program, Project, Show};
 use std::{
     net::Ipv4Addr,
     string::ToString,
-    time::{Duration, Instant}
+    time::{Duration, Instant},
 };
-use dioxus_free_icons::icons::ld_icons::{LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone};
-use log::{info, warn};
+use toaster::{ToastInfo, ToasterProvider};
 use tokio::select;
 use tokio::time::sleep;
-use toaster::{ToastInfo, ToasterProvider};
-use utils::{Loader};
-use screens::{Configure, Program, Project, Show};
-use crate::connect::connect;
-use crate::utils::{navigate, Branding, IconButton, Screen};
-use mlc_communication::services::general::View as SView;
+use utils::Loader;
 
 mod connect;
 mod toaster;
@@ -102,7 +104,7 @@ fn Connect() -> Element {
                             "Connection successful",
                             "Connection to the backend could be established.",
                         )
-                            .post();
+                        .post();
                         navigate(Screen::ProjectList);
                         // nav.replace("/projects");
                     }
@@ -112,7 +114,7 @@ fn Connect() -> Element {
                         "Connection error",
                         "Connecting to backend failed. Please see logs for more information",
                     )
-                        .post();
+                    .post();
                     error!("Error occurred: {e:?}");
                 }
             }
@@ -121,7 +123,7 @@ fn Connect() -> Element {
                 "Invalid Address",
                 "Not a valid input address provided. Could not try to connect",
             )
-                .post();
+            .post();
         }
         *loading.write() = false;
     };
@@ -153,10 +155,7 @@ fn Connect() -> Element {
                             addr.1 = v.value();
                         },
                     }
-                    button {
-                        onclick: move |_| connect_handler(),
-                        "Connect"
-                    }
+                    button { onclick: move |_| connect_handler(), "Connect" }
                 }
             },
             true => rsx! {
@@ -166,13 +165,10 @@ fn Connect() -> Element {
     }
 }
 
-
-
 #[component]
 fn View() -> Element {
     rsx! { "View" }
 }
-
 
 const PROJECT_COMMON: Asset = asset!("/assets/project_common.css");
 const CONFIGURE: Asset = asset!("/assets/configure.css");
@@ -183,32 +179,37 @@ fn ProjectLayout() -> Element {
     let mut delay = use_signal(|| 0);
     let mut status_msg = use_signal(|| "Idling".to_string());
 
-    let gen_client = use_resource(connect::<GeneralServiceIdent>);
-    use_future(move || async move {
-        let mut needs_connect = true;
+    let gen_client = use_service::<GeneralServiceIdent>()?;
 
-        let mut info_sub = None;
-        let mut status_sub = None;
-
-        async fn recv<T: Clone>(sub: &mut Option<mlc_communication::remoc::rch::watch::Receiver<T>>) -> T {
-            match sub {
-                Some(sub) => {
-                    sub.changed().await.unwrap();
-                    sub.borrow_and_update().unwrap().clone()
-                }
-                None => {
-                    futures::future::pending().await
-                }
-            }
+    use_resource(move || async move {
+        let is_valid = gen_client.read().is_valid_view(SView::Edit).await;
+        if !matches!(is_valid, Ok(true)) {
+            navigate(Screen::ProjectList);
         }
+    })
+    .suspend()?;
 
-        let mut counter = 0;
+    // let gen_client = use_resource(connect::<GeneralServiceIdent>);
+    use_future(move || async move {
+        let mut info_sub = if let Ok(info) = gen_client().info().await {
+            info
+        } else {
+            error!("Failed to recieve info sub!");
+            return;
+        };
+
+        let mut status_sub = if let Ok(status) = gen_client().status().await {
+            status
+        } else {
+            error!("Failed to receive status sub");
+            return;
+        };
+
         loop {
-            counter = (counter + 1) % 10;
-
             select! {
-                i = recv(&mut info_sub) => {
-                    match i {
+                Ok(_) = info_sub.changed() => {
+                    let info = info_sub.borrow_and_update().unwrap().clone();
+                    match info {
                         Info::Autosaved => {
                             ToastInfo::info("Autosaved", "The backend autosaved").post();
                         }
@@ -218,45 +219,95 @@ fn ProjectLayout() -> Element {
                         }
                         Info::Idle => {}
                     }
-                },
-                s = recv(&mut status_sub) => {
-                    status_msg.set(s);
-                },
-                _ = sleep(Duration::from_millis(50)) => {
-                    match &*gen_client.read() {
-                        None => {},
-                        Some(Err(e)) => {
-                            error!("Error occurred: {e:?}");
-                            return;
-                        }
-                        Some(Ok(c)) => {
-                            if needs_connect {
-                                needs_connect = false;
-
-                                let is_valid = c.is_valid_view(SView::Edit).await;
-                                if !matches!(is_valid, Ok(true)) {
-                                    navigate(Screen::ProjectList);
-                                }
-
-                                if let Ok(info) = c.info().await {
-                                    info_sub = Some(info);
-                                }
-
-                                if let Ok(s) = c.status().await {
-                                    status_sub = Some(s);
-                                }
-                            }
-
-                            if counter == 0 {
-                                let timer = Instant::now();
-                                let _ = c.alive().await;
-                                let t = timer.elapsed();
-                                *delay.write() = t.as_millis() as u64;
-                            }
-                        }
-                    }
+                }
+                Ok(_) = status_sub.changed() => {
+                    let status = status_sub.borrow_and_update().unwrap().clone();
+                    status_msg.set(status);
                 }
             }
+        }
+
+        // let mut needs_connect = true;
+
+        // let mut info_sub = None;
+        // let mut status_sub = None;
+
+        // async fn recv<T: Clone>(
+        //     sub: &mut Option<mlc_communication::remoc::rch::watch::Receiver<T>>,
+        // ) -> T {
+        //     match sub {
+        //         Some(sub) => {
+        //             sub.changed().await.unwrap();
+        //             sub.borrow_and_update().unwrap().clone()
+        //         }
+        //         None => futures::future::pending().await,
+        //     }
+        // }
+
+        // let mut counter = 0;
+        // loop {
+        //     counter = (counter + 1) % 10;
+
+        //     select! {
+        //         i = recv(&mut info_sub) => {
+        //             match i {
+        //                 Info::Autosaved => {
+        //                     ToastInfo::info("Autosaved", "The backend autosaved").post();
+        //                 }
+        //                 Info::Shutdown => {
+        //                     ToastInfo::info("Shutdown", "The backend shutdown!s").post();
+        //                     navigate(Screen::Connect);
+        //                 }
+        //                 Info::Idle => {}
+        //             }
+        //         },
+        //         s = recv(&mut status_sub) => {
+        //             status_msg.set(s);
+        //         },
+        //         _ = sleep(Duration::from_millis(50)) => {
+        //             match &*gen_client.read() {
+        //                 None => {},
+        //                 Some(Err(e)) => {
+        //                     error!("Error occurred: {e:?}");
+        //                     return;
+        //                 }
+        //                 Some(Ok(c)) => {
+        //                     if needs_connect {
+        //                         needs_connect = false;
+
+        //                         let is_valid = c.is_valid_view(SView::Edit).await;
+        //                         if !matches!(is_valid, Ok(true)) {
+        //                             navigate(Screen::ProjectList);
+        //                         }
+
+        //                         if let Ok(info) = c.info().await {
+        //                             info_sub = Some(info);
+        //                         }
+
+        //                         if let Ok(s) = c.status().await {
+        //                             status_sub = Some(s);
+        //                         }
+        //                     }
+
+        //                     if counter == 0 {
+        //                         let timer = Instant::now();
+        //                         let _ = c.alive().await;
+        //                         let t = timer.elapsed();
+        //                         *delay.write() = t.as_millis() as u64;
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+    });
+
+    use_future(move || async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let instant = Instant::now();
+            let _ = gen_client.read().alive().await;
+            *delay.write() = instant.elapsed().as_millis() as u64;
         }
     });
 
@@ -267,7 +318,7 @@ fn ProjectLayout() -> Element {
                 icon: LdCloudUpload,
                 onclick: move |_| {
                     info!("Open fixture adder");
-                }
+                },
             }
         },
         Route::Program {} => rsx! {},
@@ -276,64 +327,61 @@ fn ProjectLayout() -> Element {
                 icon: LdTabletSmartphone,
                 onclick: move |_| {
                     info!("Open mobile connector");
-                }
+                },
             }
         },
         _ => {
             warn!("Shouldn't be here");
             rsx! {}
-        },
+        }
     };
 
     rsx! {
-        div {
-            class: "projectContainer",
+        div { class: "projectContainer",
             document::Stylesheet { href: PROJECT_COMMON }
             document::Stylesheet { href: CONFIGURE }
             document::Stylesheet { href: PROGRAM }
             document::Stylesheet { href: SHOW }
             nav {
                 Branding {}
-                div {
-                    class: "viewSelect",
+                div { class: "viewSelect",
                     IconButton {
-                        class: if matches!(r, Route::Configure {}) {"curr"},
+                        class: if matches!(r, Route::Configure {}) { "curr" },
                         style: "--c-cl: var(--c-p);",
                         icon: LdCog,
                         onclick: move |_| {
                             navigate(Screen::Configure);
-                        }
+                        },
                     }
                     IconButton {
-                        class: if matches!(r, Route::Program {}) {"curr"},
+                        class: if matches!(r, Route::Program {}) { "curr" },
                         style: "--c-cl: var(--c-s);",
                         icon: LdPencil,
                         onclick: move |_| {
                             navigate(Screen::Program);
-                        }
+                        },
                     }
                     IconButton {
-                        class: if matches!(r, Route::Show {}) {"curr"},
+                        class: if matches!(r, Route::Show {}) { "curr" },
                         style: "--c-cl: var(--c-t);",
                         icon: LdLightbulb,
                         onclick: move |_| {
                             navigate(Screen::Show);
-                        }
+                        },
                     }
                 }
                 div { class: "actions",
-                    {extra_actions},
+                    {extra_actions}
                     IconButton {
                         icon: LdSave,
                         onclick: async |_| {
                             info!("Saving");
-                            // CREATE_PROJECT.open().await;
                         },
                     }
                 }
             }
             Outlet::<Route> {}
-            footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read()) } }
+            footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read())} }
         }
     }
 }

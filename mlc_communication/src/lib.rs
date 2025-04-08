@@ -13,7 +13,5 @@ pub type ServiceIdentifier = [u8; 5];
 
 pub trait ServiceIdentifiable {
     const IDENT: ServiceIdentifier;
-    type Client: RemoteSend;
+    type Client: remoc::rtc::Client + RemoteSend + Clone;
 }
-
-
