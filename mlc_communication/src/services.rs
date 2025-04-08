@@ -22,7 +22,7 @@ pub mod general {
     pub enum Info {
         Idle,
         Shutdown,
-        Autosaved
+        Autosaved,
     }
 
     #[rtc::remote]
@@ -35,10 +35,10 @@ pub mod general {
 }
 
 pub mod project_selection {
-    use remoc::rtc;
-    use serde::{Deserialize, Serialize};
     use crate::{ServiceIdentifiable, ServiceIdentifier};
     use mlc_data::project::{ProjectMetadata, ProjectType};
+    use remoc::rtc;
+    use serde::{Deserialize, Serialize};
 
     pub struct ProjectSelectionServiceIdent;
     impl ServiceIdentifiable for ProjectSelectionServiceIdent {
@@ -50,7 +50,11 @@ pub mod project_selection {
 
     #[rtc::remote]
     pub trait ProjectSelectionService {
-        async fn create(&self, name: String, kind: ProjectType) -> Result<ProjectIdent, ProjectSelectionServiceError>;
+        async fn create(
+            &self,
+            name: String,
+            kind: ProjectType,
+        ) -> Result<ProjectIdent, ProjectSelectionServiceError>;
         async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError>;
         async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError>;
         async fn delete(&self, ident: ProjectIdent) -> Result<(), ProjectSelectionServiceError>;
@@ -72,6 +76,29 @@ pub mod project_selection {
 
         #[error("Network communication error: {0:?}")]
         RemocError(#[from] rtc::CallError),
+    }
+}
 
+pub mod project {
+    use crate::{ServiceIdentifiable, ServiceIdentifier};
+    use remoc::rtc;
+    use serde::{Deserialize, Serialize};
+
+    pub struct ProjectServiceIdent;
+    impl ServiceIdentifiable for ProjectServiceIdent {
+        const IDENT: ServiceIdentifier = *b"prjts";
+
+        type Client = ProjectServiceClient;
+    }
+
+    #[rtc::remote]
+    pub trait ProjectService {
+        async fn save(&self) -> Result<(), ProjectServiceError>;
+    }
+
+    #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
+    pub enum ProjectServiceError {
+        #[error("Network communication error: {0:?}")]
+        RemocError(#[from] rtc::CallError),
     }
 }

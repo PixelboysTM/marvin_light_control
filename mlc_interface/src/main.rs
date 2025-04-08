@@ -9,6 +9,7 @@ use dioxus_free_icons::icons::ld_icons::{
 use log::{info, warn};
 use mlc_communication::services::general::View as SView;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
+use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
 use screens::{Configure, Program, Project, Show};
 use std::{
     net::Ipv4Addr,
@@ -234,6 +235,8 @@ fn ProjectLayout() -> Element {
         }
     });
 
+    let prj_service = use_service::<ProjectServiceIdent>()?;
+
     let r: Route = use_route();
     let extra_actions = match r {
         Route::Configure {} => rsx! {
@@ -297,8 +300,9 @@ fn ProjectLayout() -> Element {
                     {extra_actions}
                     IconButton {
                         icon: LdSave,
-                        onclick: async |_| {
+                        onclick: move |_| async move {
                             info!("Saving");
+                            let _ = prj_service.read().save().await;
                         },
                     }
                 }
