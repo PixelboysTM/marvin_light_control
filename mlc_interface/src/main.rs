@@ -3,16 +3,18 @@ use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
-use std::net::Ipv4Addr;
-use std::string::ToString;
-use std::time::{Duration, Instant};
+use std::{
+    net::Ipv4Addr,
+    string::ToString,
+    time::{Duration, Instant}
+};
 use dioxus_free_icons::icons::ld_icons::{LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone};
 use log::{info, warn};
 use tokio::select;
 use tokio::time::sleep;
 use toaster::{ToastInfo, ToasterProvider};
 use utils::{Loader};
-use screens::projects::Project;
+use screens::{Configure, Program, Project, Show};
 use crate::connect::connect;
 use crate::utils::{navigate, Branding, IconButton, Screen};
 use mlc_communication::services::general::View as SView;
@@ -167,27 +169,15 @@ fn Connect() -> Element {
 
 
 #[component]
-fn Configure() -> Element {
-    rsx! { "Configure" }
-}
-
-#[component]
-fn Program() -> Element {
-    rsx! { "Program" }
-}
-
-#[component]
-fn Show() -> Element {
-    rsx! { "Show" }
-}
-
-#[component]
 fn View() -> Element {
     rsx! { "View" }
 }
 
 
 const PROJECT_COMMON: Asset = asset!("/assets/project_common.css");
+const CONFIGURE: Asset = asset!("/assets/configure.css");
+const PROGRAM: Asset = asset!("/assets/program.css");
+const SHOW: Asset = asset!("/assets/show.css");
 #[component]
 fn ProjectLayout() -> Element {
     let mut delay = use_signal(|| 0);
@@ -299,6 +289,9 @@ fn ProjectLayout() -> Element {
         div {
             class: "projectContainer",
             document::Stylesheet { href: PROJECT_COMMON }
+            document::Stylesheet { href: CONFIGURE }
+            document::Stylesheet { href: PROGRAM }
+            document::Stylesheet { href: SHOW }
             nav {
                 Branding {}
                 div {

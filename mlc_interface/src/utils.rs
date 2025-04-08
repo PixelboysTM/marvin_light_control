@@ -163,3 +163,20 @@ pub fn navigate(screen: Screen) {
         Screen::Show => "Marvin Light Control | Show",
     });
 }
+
+#[component]
+pub fn Panel(children: Option<Element>, column: String, row: String, title: Option<String>) -> Element {
+    rsx!{
+        div{
+            class: "panel",
+            style: format!("grid-column: {column}; grid-row: {row}",),
+            if let Some(title) = title {
+                h1 {
+                    class: "title",
+                    {title}
+                }
+            }
+            {children}
+        }
+    }
+}

@@ -1,0 +1,10 @@
+.projectContainer .configure {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    padding: var(--space);
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap: var(--space);
+
+}

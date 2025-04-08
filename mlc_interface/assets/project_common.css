@@ -45,4 +45,18 @@
         background-color: var(--c-pnl);
         width: 100vw;
     }
+
+    .panel {
+        background-color: var(--c-pnl);
+        border-radius: var(--br);
+
+        h1.title {
+            margin: 0;
+            padding: 0.1em 0;
+            width: 100%;
+            text-align: center;
+            font-size: 1.2em;
+            border-bottom: 1px solid var(--c-p);
+        }
+    }
 }
