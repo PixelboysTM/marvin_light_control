@@ -16,7 +16,7 @@ const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
 const CREATE_PROJECT: Symbol = Symbol::create("create-project");
 #[component]
-pub fn Project() -> Element {
+pub fn Projects() -> Element {
     let m_client = use_resource(async || {
         let res = connect::<GeneralServiceIdent>().await;
         if res.is_err() {
@@ -56,7 +56,10 @@ pub fn Project() -> Element {
                         navigator().replace("/");
                     }
                     Info::Autosaved => {
-                        ToastInfo::info("Autosaved", "The backend autosaved").post();
+                        ToastInfo::info("Autosaved", "The backend autosaved.").post();
+                    }
+                    Info::Saved => {
+                        ToastInfo::warn("Saved", "The project was successfully written to disk! But why here?").post();
                     }
                 }
             }

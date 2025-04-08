@@ -1,12 +1,19 @@
 pub mod general {
-    use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifier};
+    use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use macro_rules_attribute::derive;
+
     use remoc::{rch::watch, rtc};
 
     pub struct GeneralServiceIdent;
     impl ServiceIdentifiable for GeneralServiceIdent {
         const IDENT: ServiceIdentifier = *b"genrl";
         type Client = GeneralServiceClient;
+    }
+
+    impl<T: GeneralService + Send + Sync + 'static> ServiceIdentifiableServer<T>
+        for GeneralServiceIdent
+    {
+        type S = GeneralServiceServerShared<T>;
     }
 
     #[derive(Com!)]
@@ -22,6 +29,7 @@ pub mod general {
     pub enum Info {
         Idle,
         Shutdown,
+        Saved,
         Autosaved,
     }
 
@@ -35,7 +43,7 @@ pub mod general {
 }
 
 pub mod project_selection {
-    use crate::{ServiceIdentifiable, ServiceIdentifier};
+    use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use mlc_data::project::{ProjectMetadata, ProjectType};
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
@@ -44,6 +52,11 @@ pub mod project_selection {
     impl ServiceIdentifiable for ProjectSelectionServiceIdent {
         const IDENT: ServiceIdentifier = *b"prjsl";
         type Client = ProjectSelectionServiceClient;
+    }
+    impl<T: ProjectSelectionService + Send + Sync + 'static> ServiceIdentifiableServer<T>
+        for ProjectSelectionServiceIdent
+    {
+        type S = ProjectSelectionServiceServerShared<T>;
     }
 
     pub type ProjectIdent = String;
@@ -80,15 +93,21 @@ pub mod project_selection {
 }
 
 pub mod project {
-    use crate::{ServiceIdentifiable, ServiceIdentifier};
+    use crate::services::general::GeneralService;
+    use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
 
     pub struct ProjectServiceIdent;
     impl ServiceIdentifiable for ProjectServiceIdent {
         const IDENT: ServiceIdentifier = *b"prjts";
-
         type Client = ProjectServiceClient;
+    }
+
+    impl<T: ProjectService + Send + Sync + 'static> ServiceIdentifiableServer<T>
+        for ProjectServiceIdent
+    {
+        type S = ProjectServiceServerShared<T>;
     }
 
     #[rtc::remote]
@@ -98,6 +117,12 @@ pub mod project {
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
     pub enum ProjectServiceError {
+        #[error("It is no valid project loaded!")]
+        InvalidProject,
+
+        #[error("Saving Project Failed: {0:?}")]
+        SavingFailed(String),
+
         #[error("Network communication error: {0:?}")]
         RemocError(#[from] rtc::CallError),
     }

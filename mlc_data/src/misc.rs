@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use log::debug;
 use crate::DynamicError;
 
 #[macro_export]
@@ -35,4 +36,15 @@ impl ContextError {
     pub fn to_generic(self) -> DynamicError {
         format!("{self:?}").into()
     }
+}
+
+pub trait ErrIgnore{
+    fn ignore(self);
+    fn bin(self) where Self: std::marker::Sized {
+        self.ignore();
+    }
+}
+
+impl<T, E> ErrIgnore for Result<T, E> {
+    fn ignore(self) {}
 }

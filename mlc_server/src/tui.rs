@@ -61,8 +61,7 @@ impl TuiApp {
     }
 
     async fn update_meta_information(&mut self) {
-        let obj = self.service_obj.read().await;
-        if *obj.valid_project.read().await {
+        if self.service_obj.project_valid().await {
             self.meta_information = Some(MetaInformation {});
         } else {
             self.meta_information = None;

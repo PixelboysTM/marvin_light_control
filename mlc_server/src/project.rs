@@ -6,7 +6,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 use chrono::Local;
+use futures::future::ok;
 use log::{error, info, warn};
+use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use mlc_communication::services::general::Info;
+use mlc_communication::services::project::{ProjectService, ProjectServiceError};
+use mlc_data::misc::ErrIgnore;
 use mlc_data::project::{ProjectSettings, ToFileName};
 use crate::project::project_loader::Plm;
 
@@ -19,6 +24,45 @@ pub struct Project {
     pub blueprints: Vec<FixtureBlueprint>,
     pub settings: ProjectSettings,
 }
+
+
+#[rtc::async_trait]
+impl ProjectService for ServiceImpl {
+    async fn save(&self) -> Result<(), ProjectServiceError> {
+        let mut p = self.validate_project_mut().await?;
+        p.save().await.map_err(ProjectServiceError::SavingFailed)?;
+
+        self.info.send(Info::Saved).ignore();
+        self.status.send(format!("Saved Project '{}' to disk!", p.metadata.name)).ignore();
+
+        Ok(())
+    }
+}
+
+impl ServiceImpl {
+    pub async fn project_valid(&self) -> bool {
+        *self.valid_project.read().await
+    }
+
+    pub async fn validate_project(&self) -> Result<RwLockReadGuard<'_, Project>, ProjectServiceError> {
+        if !self.project_valid().await {
+            Err(ProjectServiceError::InvalidProject)
+        } else {
+            Ok(self.project.read().await)
+        }
+
+    }
+
+    pub async fn validate_project_mut(&self) -> Result<RwLockWriteGuard<'_, Project>, ProjectServiceError> {
+        if !self.project_valid().await {
+            Err(ProjectServiceError::InvalidProject)
+        } else {
+            Ok(self.project.write().await)
+        }
+
+    }
+}
+
 
 fn to_pl_err(e: tokio::io::Error) -> ProjectSelectionServiceError {
     error!("tokio io error: {:?}", e);

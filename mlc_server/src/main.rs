@@ -28,15 +28,15 @@ const DEFAULT_SERVER_PORT: u16 = 8181;
 pub struct ServiceImpl {
     project: Arc<RwLock<Project>>,
     valid_project: RwLock<bool>,
-    info_subscribers: Sender<Info>,
-    status_subscribers: Sender<String>,
+    info: Sender<Info>,
+    status: Sender<String>,
     adapt_notifier: Arc<Notify>
 }
-pub type AServiceImpl = Arc<RwLock<ServiceImpl>>;
+pub type AServiceImpl = Arc<ServiceImpl>;
 
 impl ServiceImpl {
     pub fn send_info(&self, info: Info) {
-        if let Err(err) = self.info_subscribers.send(info) {
+        if let Err(err) = self.info.send(info) {
             error!("SendInfo error: {err:#?}");
         }
     }
@@ -55,12 +55,12 @@ impl com::services::general::GeneralService for ServiceImpl {
     }
 
     async fn info(&self) -> Result<Receiver<Info>, CallError> {
-        let rx = self.info_subscribers.subscribe();
+        let rx = self.info.subscribe();
         Ok(rx)
     }
 
     async fn status(&self) -> Result<Receiver<String>, CallError> {
-        let rx = self.status_subscribers.subscribe();
+        let rx = self.status.subscribe();
         Ok(rx)
     }
 }
@@ -72,13 +72,13 @@ async fn main() {
     let project = Arc::new(RwLock::new(create_default_project()));
     let adapt_notifier = Arc::new(Notify::new());
 
-    let service_obj = Arc::new(RwLock::new(ServiceImpl {
+    let service_obj = Arc::new(ServiceImpl {
         project,
         valid_project: RwLock::new(false),
-        info_subscribers: rch::watch::channel(Info::Idle).0,
-        status_subscribers: rch::watch::channel(String::new()).0,
+        info: rch::watch::channel(Info::Idle).0,
+        status: rch::watch::channel(String::new()).0,
         adapt_notifier: adapt_notifier.clone()
-    }));
+    });
 
 
     let task_cancel_token = CancellationToken::new();
@@ -119,17 +119,16 @@ async fn main() {
 }
 
 async fn create_shutdown_notifier(
-    obj: Arc<RwLock<ServiceImpl>>,
+    obj: AServiceImpl,
     task_cancel_token: CancellationToken,
 ) {
     task_cancel_token.cancelled().await;
-    let s = obj.write().await;
 
-    let mut p = s.project.write().await;
-    if *s.valid_project.read().await && p.settings.save_on_quit {
+    let mut p = obj.project.write().await;
+    if obj.project_valid().await && p.settings.save_on_quit {
         p.save().await.unwrap();
     }
-    s.send_info(Info::Shutdown);
+    obj.send_info(Info::Shutdown);
 }
 
 fn setup_logging() -> Result<(), fern::InitError> {
@@ -168,7 +167,7 @@ async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>
     }
 
     loop {
-        let duration = save_fut(&*service_obj.read().await.project.read().await, *service_obj.read().await.valid_project.read().await);
+        let duration = save_fut(&*service_obj.project.read().await, *service_obj.valid_project.read().await);
 
         select! {
             _ = adapt_notifier.notified() => {
@@ -179,9 +178,8 @@ async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>
             }
             _ = duration => {
                 info!("Autosave triggered!");
-                let s = service_obj.write().await;
-                let _ = s.project.write().await.save().await.map_err(|e| error!("{e:?}"));
-                s.send_info(Info::Autosaved);
+                let _ = service_obj.project.write().await.save().await.map_err(|e| error!("{e:?}"));
+                service_obj.send_info(Info::Autosaved);
             }
         }
 

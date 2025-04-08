@@ -4,21 +4,19 @@ use std::sync::Arc;
 use log::error;
 use mlc_communication::remoc::rtc::ServerBase;
 use mlc_communication::remoc::{self, prelude::*};
-use mlc_communication::{ServiceIdentifiable, services::*};
+use mlc_communication::{ServiceIdentifiable, ServiceIdentifiableServer, services::*};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
+use mlc_communication::services::general::GeneralServiceIdent;
+use mlc_communication::services::project::ProjectServiceIdent;
+use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
+use crate::{AServiceImpl, ServiceImpl};
 
-use crate::ServiceImpl;
-
-pub async fn setup_server(
-    port: u16,
-    service_obj: Arc<RwLock<ServiceImpl>>,
-    shutdown: CancellationToken,
-) {
+pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: CancellationToken) {
     log::info!("Starting Server...");
 
     log::info!("Listening on port {}", port);
@@ -48,7 +46,7 @@ pub async fn setup_server(
 }
 
 fn handle_connection(
-    service_obj: &Arc<RwLock<ServiceImpl>>,
+    service_obj: &AServiceImpl,
     socket: tokio::net::TcpStream,
     addr: std::net::SocketAddr,
 ) {
@@ -67,26 +65,27 @@ fn handle_connection(
 
         log::info!("Got ident msg: {}", ident);
 
+        // let service_idents: Vec<Box<dyn ServiceIdentifiableServer<ServiceImpl>>> = vec![
+        //     Box::new(project_selection::ProjectSelectionServiceIdent),
+        //     Box::new(general::GeneralServiceIdent),
+        //     Box::new(project::ProjectServiceIdent),
+        // ];
+
         match buffer {
-            project_selection::ProjectSelectionServiceIdent::IDENT => {
-                create::<_, project_selection::ProjectSelectionServiceServerSharedMut<_>>(
-                    service_obj,
-                    socket_rx,
-                    socket_tx,
-                    ident,
-                )
+            ProjectSelectionServiceIdent::IDENT => {
+                ProjectSelectionServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
                 .await
                 .unwrap();
             }
-            general::GeneralServiceIdent::IDENT => {
-                create::<_, general::GeneralServiceServerSharedMut<_>>(
-                    service_obj,
-                    socket_rx,
-                    socket_tx,
-                    ident,
-                )
-                .await
-                .unwrap();
+            GeneralServiceIdent::IDENT => {
+                GeneralServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
+                    .await
+                    .unwrap();
+            }
+            ProjectServiceIdent::IDENT => {
+                ProjectServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
+                    .await
+                    .unwrap();
             }
             _ => {
                 log::error!("Identifier was not valid!");
@@ -95,14 +94,14 @@ fn handle_connection(
     });
 }
 
-async fn create<T: Send + Sync + 'static, S: ServerSharedMut<T, remoc::codec::Default>>(
-    service_obj: Arc<RwLock<T>>,
+async fn create<T: Send + Sync + 'static, S: ServerShared<T, remoc::codec::Default>>(
+    service_obj: Arc<T>,
     socket_rx: OwnedReadHalf,
     socket_tx: OwnedWriteHalf,
     ident: String,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    <S as ServerBase>::Client: RemoteSend,
+    <S as ServerBase>::Client: RemoteSend + Clone,
 {
     let (server, client) = S::new(service_obj, 1);
 

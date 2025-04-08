@@ -10,7 +10,7 @@ use log::{info, warn};
 use mlc_communication::services::general::View as SView;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
-use screens::{Configure, Program, Project, Show};
+use screens::{Configure, Program, Projects, Show};
 use std::{
     net::Ipv4Addr,
     string::ToString,
@@ -32,7 +32,7 @@ enum Route {
     #[route("/")]
     Connect {},
     #[route("/projects")]
-    Project {  },
+    Projects {  },
     #[layout(ProjectLayout)]
     #[nest("/project")]
         #[route("/configure")]
@@ -206,8 +206,8 @@ fn ProjectLayout() -> Element {
         loop {
             select! {
                 Ok(_) = info_sub.changed() => {
-                    let info = info_sub.borrow_and_update().unwrap().clone();
-                    match info {
+                    let info = info_sub.borrow_and_update().unwrap();
+                    match *info {
                         Info::Autosaved => {
                             ToastInfo::info("Autosaved", "The backend autosaved").post();
                         }
@@ -216,6 +216,9 @@ fn ProjectLayout() -> Element {
                             navigate(Screen::Connect);
                         }
                         Info::Idle => {}
+                        Info::Saved => {
+                            ToastInfo::info("Saved", "The project was successfully written to disk!").post();
+                        }
                     }
                 }
                 Ok(_) = status_sub.changed() => {
