@@ -18,6 +18,7 @@ tokio.workspace = true
 chrono = { version = "0.4.40", features = ["serde"] }
 log = "0.4.26"
 uuid = { version = "1.15.1", features = ["v4"] }
+fuzzy-matcher = "*"
 
 [features]
 default = ["desktop"]

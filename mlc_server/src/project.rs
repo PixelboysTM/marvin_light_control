@@ -1,19 +1,26 @@
 use crate::ServiceImpl;
+use crate::project::project_loader::Plm;
+use chrono::Local;
+use log::{error, info, warn};
 use mlc_communication::remoc::rtc;
-use mlc_communication::services::project_selection::{ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError};
-use mlc_data::{fixture::blueprint::FixtureBlueprint, project::{ProjectMetadata, ProjectType}, DynamicResult};
+use mlc_communication::services::general::Info;
+use mlc_communication::services::project::{
+    FixtureBlueprintHead, ProjectService, ProjectServiceError,
+};
+use mlc_communication::services::project_selection::{
+    ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
+};
+use mlc_data::misc::ErrIgnore;
+use mlc_data::project::{ProjectSettings, ToFileName};
+use mlc_data::{
+    DynamicResult,
+    fixture::blueprint::FixtureBlueprint,
+    project::{ProjectMetadata, ProjectType},
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
-use chrono::Local;
-use futures::future::ok;
-use log::{error, info, warn};
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
-use mlc_communication::services::general::Info;
-use mlc_communication::services::project::{ProjectService, ProjectServiceError};
-use mlc_data::misc::ErrIgnore;
-use mlc_data::project::{ProjectSettings, ToFileName};
-use crate::project::project_loader::Plm;
 
 mod project_loader;
 
@@ -25,7 +32,6 @@ pub struct Project {
     pub settings: ProjectSettings,
 }
 
-
 #[rtc::async_trait]
 impl ProjectService for ServiceImpl {
     async fn save(&self) -> Result<(), ProjectServiceError> {
@@ -33,9 +39,32 @@ impl ProjectService for ServiceImpl {
         p.save().await.map_err(ProjectServiceError::SavingFailed)?;
 
         self.info.send(Info::Saved).ignore();
-        self.status.send(format!("Saved Project '{}' to disk!", p.metadata.name)).ignore();
+        self.status
+            .send(format!("Saved Project '{}' to disk!", p.metadata.name))
+            .ignore();
 
         Ok(())
+    }
+    async fn list_available_fixture_blueprints(
+        &self,
+    ) -> Result<Vec<FixtureBlueprintHead>, ProjectServiceError> {
+        let heads = self
+            .ofl_library
+            .read(Some(|s| {
+                info!("OflLoadMsg: {s}");
+                self.status.send(s).ignore();
+            }))
+            .await
+            .map_err(|e| ProjectServiceError::BlueprintListFailed(e.to_string()))?
+            .into_iter()
+            .map(|fb| FixtureBlueprintHead {
+                meta: fb.meta,
+                modes: fb.modes.into_iter().map(|m| m.name).collect(),
+                num_channels: fb.channels.len() as u32,
+            })
+            .collect::<Vec<_>>();
+
+        Ok(heads)
     }
 }
 
@@ -44,25 +73,26 @@ impl ServiceImpl {
         *self.valid_project.read().await
     }
 
-    pub async fn validate_project(&self) -> Result<RwLockReadGuard<'_, Project>, ProjectServiceError> {
+    pub async fn validate_project(
+        &self,
+    ) -> Result<RwLockReadGuard<'_, Project>, ProjectServiceError> {
         if !self.project_valid().await {
             Err(ProjectServiceError::InvalidProject)
         } else {
             Ok(self.project.read().await)
         }
-
     }
 
-    pub async fn validate_project_mut(&self) -> Result<RwLockWriteGuard<'_, Project>, ProjectServiceError> {
+    pub async fn validate_project_mut(
+        &self,
+    ) -> Result<RwLockWriteGuard<'_, Project>, ProjectServiceError> {
         if !self.project_valid().await {
             Err(ProjectServiceError::InvalidProject)
         } else {
             Ok(self.project.write().await)
         }
-
     }
 }
-
 
 fn to_pl_err(e: tokio::io::Error) -> ProjectSelectionServiceError {
     error!("tokio io error: {:?}", e);
@@ -80,7 +110,9 @@ fn to_po_err<E: std::error::Error>(e: E) -> ProjectSelectionServiceError {
 
 async fn get_valid_project_dir() -> DynamicResult<PathBuf> {
     let projects_dir = get_base_app_dir().join("projects");
-    tokio::fs::create_dir_all(&projects_dir).await.map_err(to_pl_err)?;
+    tokio::fs::create_dir_all(&projects_dir)
+        .await
+        .map_err(to_pl_err)?;
     Ok(projects_dir)
 }
 
@@ -117,12 +149,13 @@ impl ProjectSelectionService for ServiceImpl {
         name: String,
         kind: ProjectType,
     ) -> Result<ProjectIdent, ProjectSelectionServiceError> {
-
         let mut p = create_default_project();
         p.metadata.name = name;
         p.metadata.created_at = Local::now();
         p.metadata.project_type = kind;
-        p.metadata.file_name =  make_save_file_name(&p.metadata.name, &kind).await.map_err(|e| ProjectSelectionServiceError::ProjectCreateError(e.to_string()))?;
+        p.metadata.file_name = make_save_file_name(&p.metadata.name, &kind)
+            .await
+            .map_err(|e| ProjectSelectionServiceError::ProjectCreateError(e.to_string()))?;
 
         let identifier = p.metadata.file_name.clone();
         p.save().await.map_err(to_pc_err)?;
@@ -133,7 +166,9 @@ impl ProjectSelectionService for ServiceImpl {
     async fn list(&self) -> Result<Vec<ProjectMetadata>, ProjectSelectionServiceError> {
         let mut projects = vec![];
 
-        let projects_dir = get_valid_project_dir().await.map_err(|e| ProjectSelectionServiceError::ProjectListError(e.to_string()))?;
+        let projects_dir = get_valid_project_dir()
+            .await
+            .map_err(|e| ProjectSelectionServiceError::ProjectListError(e.to_string()))?;
 
         match projects_dir.canonicalize() {
             Ok(path) => {
@@ -155,7 +190,11 @@ impl ProjectSelectionService for ServiceImpl {
                                 match meta {
                                     Ok(mut meta) => {
                                         meta.project_type = loader.kind();
-                                        meta.file_name = file_name.split('.').next().expect("Must be").to_string();
+                                        meta.file_name = file_name
+                                            .split('.')
+                                            .next()
+                                            .expect("Must be")
+                                            .to_string();
                                         projects.push(meta);
                                     }
                                     Err(e) => {
@@ -180,14 +219,17 @@ impl ProjectSelectionService for ServiceImpl {
     }
 
     async fn open(&self, ident: ProjectIdent) -> Result<bool, ProjectSelectionServiceError> {
-        let projects_dir = get_valid_project_dir().await.map_err(|e| ProjectSelectionServiceError::ProjectOpenError(e.to_string()))?;
-
+        let projects_dir = get_valid_project_dir()
+            .await
+            .map_err(|e| ProjectSelectionServiceError::ProjectOpenError(e.to_string()))?;
 
         for loader in Plm::loaders() {
             let path = projects_dir.join(format!("{}.{}", &ident, loader.kind().extension()));
             if path.exists() && path.is_file() {
                 let content = tokio::fs::read(path).await.map_err(to_po_err)?;
-                let mut p = loader.load_project(content).map_err(|e| ProjectSelectionServiceError::ProjectOpenError(format!("{e:?}")))?;
+                let mut p = loader.load_project(content).map_err(|e| {
+                    ProjectSelectionServiceError::ProjectOpenError(format!("{e:?}"))
+                })?;
 
                 p.metadata.project_type = loader.kind();
                 p.metadata.file_name = ident.clone();
@@ -224,7 +266,7 @@ impl Project {
             settings: ProjectSettings {
                 autosave: Some(Duration::from_secs(30 * 60)),
                 save_on_quit: true,
-            }
+            },
         }
     }
 }
@@ -233,12 +275,11 @@ pub fn create_default_project() -> Project {
     Project::new()
 }
 
-fn get_base_app_dir() -> PathBuf {
+pub fn get_base_app_dir() -> PathBuf {
     let project_dirs = directories::ProjectDirs::from("de", "timfritzen", "marvin_light_control")
         .expect("Could not get project directory");
     project_dirs.data_dir().to_path_buf()
 }
-
 
 impl Project {
     pub async fn save(&mut self) -> Result<(), String> {
@@ -249,17 +290,15 @@ impl Project {
         self.metadata.file_name = "".to_owned();
         self.metadata.project_type = ProjectType::Invalid;
 
-
-
         let projects_dir = get_valid_project_dir().await.map_err(|e| e.to_string())?;
 
         let path = projects_dir.join(format!("{}.{}", &identifier, kind.extension()));
 
-
         let loader = Plm::for_kind(&kind).ok_or(format!("No saver found for {kind:?}"))?;
         let data = loader.store_project(self).map_err(|e| format!("{e:}"))?;
-        tokio::fs::write(path, data).await.map_err(|e| format!("{e:?}"))?;
-
+        tokio::fs::write(path, data)
+            .await
+            .map_err(|e| format!("{e:?}"))?;
 
         self.metadata.file_name = identifier;
         self.metadata.project_type = kind;

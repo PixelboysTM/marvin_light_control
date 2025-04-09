@@ -93,8 +93,8 @@ pub mod project_selection {
 }
 
 pub mod project {
-    use crate::services::general::GeneralService;
     use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
+    use mlc_data::fixture::blueprint::Metadata;
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
 
@@ -110,18 +110,31 @@ pub mod project {
         type S = ProjectServiceServerShared<T>;
     }
 
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+    pub struct FixtureBlueprintHead {
+        pub meta: Metadata,
+        pub modes: Vec<String>,
+        pub num_channels: u32,
+    }
+
     #[rtc::remote]
     pub trait ProjectService {
         async fn save(&self) -> Result<(), ProjectServiceError>;
+        async fn list_available_fixture_blueprints(
+            &self,
+        ) -> Result<Vec<FixtureBlueprintHead>, ProjectServiceError>;
     }
 
-    #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
+    #[derive(Debug, thiserror::Error, Serialize, Deserialize, Clone)]
     pub enum ProjectServiceError {
         #[error("It is no valid project loaded!")]
         InvalidProject,
 
         #[error("Saving Project Failed: {0:?}")]
         SavingFailed(String),
+
+        #[error("Listing avaiable fixture blueprints failed: {0:?}")]
+        BlueprintListFailed(String),
 
         #[error("Network communication error: {0:?}")]
         RemocError(#[from] rtc::CallError),

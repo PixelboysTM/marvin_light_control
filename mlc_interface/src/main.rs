@@ -1,15 +1,17 @@
 use crate::utils::{navigate, Branding, IconButton, Screen};
-use connect::{connect_url, use_service};
+use connect::{connect_url, use_service, RtcSuspend, SClient};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
 use dioxus_free_icons::icons::ld_icons::{
-    LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
+    LdCloudUpload, LdCog, LdLamp, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
 };
 use log::{info, warn};
 use mlc_communication::services::general::View as SView;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
-use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
+use mlc_communication::services::project::{
+    ProjectService, ProjectServiceClient, ProjectServiceIdent,
+};
 use screens::{Configure, Program, Projects, Show};
 use std::{
     net::Ipv4Addr,
@@ -18,7 +20,7 @@ use std::{
 };
 use toaster::{ToastInfo, ToasterProvider};
 use tokio::select;
-use utils::Loader;
+use utils::{Loader, Modal, ModalVariant, Symbol};
 
 mod connect;
 mod toaster;
@@ -169,6 +171,8 @@ fn View() -> Element {
     rsx! { "View" }
 }
 
+const ADD_FIXTURE_MODAL: Symbol = Symbol::create("add-fixture-modal");
+
 const PROJECT_COMMON: Asset = asset!("/assets/project_common.css");
 const CONFIGURE: Asset = asset!("/assets/configure.css");
 const PROGRAM: Asset = asset!("/assets/program.css");
@@ -245,8 +249,9 @@ fn ProjectLayout() -> Element {
         Route::Configure {} => rsx! {
             IconButton {
                 icon: LdCloudUpload,
-                onclick: move |_| {
+                onclick: move |_| async {
                     info!("Open fixture adder");
+                    ADD_FIXTURE_MODAL.open().await;
                 },
             }
         },
@@ -312,6 +317,63 @@ fn ProjectLayout() -> Element {
             }
             Outlet::<Route> {}
             footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read())} }
+
+            Modal {
+                title: "Fixture Explorer",
+                ident: ADD_FIXTURE_MODAL,
+                variant: ModalVariant::OkCancel,
+                icon: LdLamp,
+                oktext: "Import",
+                onexit: move |a| {},
+                AddFixtureBlueprintModal { project: prj_service }
+            }
+        }
+    }
+}
+
+#[component]
+fn AddFixtureBlueprintModal(project: SClient<ProjectServiceIdent>) -> Element {
+    let available_projects =
+        use_resource(
+            move || async move { project.read().list_available_fixture_blueprints().await },
+        )
+        .rtc_suspend()?;
+
+    let mut search = use_signal(|| "".to_string());
+
+    let filtered_projects = use_memo(move || {
+        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
+        available_projects
+            .read()
+            .iter()
+            .filter(|p| {
+                if search.read().is_empty() {
+                    true
+                } else {
+                    matcher
+                        .fuzzy(&p.meta.identifier, &*search.read(), false)
+                        .map(|(s, _)| s > 0)
+                        .unwrap_or(false)
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+    });
+
+    rsx! {
+        input {
+            value: search(),
+            oninput: move |v| {
+                search.set(v.value());
+            },
+        }
+        div { class: "list",
+            for p in filtered_projects() {
+                div { class: "blueprint",
+                    h1 { {p.meta.name.clone()} }
+                    code { {p.meta.identifier.clone()} }
+                }
+            }
         }
     }
 }

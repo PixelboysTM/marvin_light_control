@@ -114,7 +114,23 @@ pub fn Modal<
                         },
                     }
                 }
-                div { class: "content", {children} }
+                div { class: "content",
+                    ErrorBoundary {
+                        handle_error: move |e: ErrorContext| {
+                            rsx! {
+                                for err in e.errors() {
+                                    code { style: "color: var(--c-err);", {err.to_string()} }
+                                }
+                            }
+                        },
+                        SuspenseBoundary {
+                            fallback: move |_| rsx! {
+                                Loader {}
+                            },
+                            {children}
+                        }
+                    }
+                }
                 div { class: "footer",
                     button {
                         onclick: move |_| {

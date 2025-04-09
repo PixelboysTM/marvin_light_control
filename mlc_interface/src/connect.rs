@@ -34,6 +34,8 @@ pub enum UseServiceState<T> {
     Errored(Box<dyn std::error::Error>),
 }
 
+pub type SClient<S: ServiceIdentifiable> = Memo<UniqueEq<S::Client>>;
+
 pub fn use_service_url<I: ServiceIdentifiable>(
     addr: (Ipv4Addr, u16),
 ) -> Result<Memo<UniqueEq<I::Client>>, RenderError> {
@@ -69,4 +71,20 @@ pub fn use_service_url<I: ServiceIdentifiable>(
 
 pub fn use_service<I: ServiceIdentifiable>() -> Result<Memo<UniqueEq<I::Client>>, RenderError> {
     use_service_url::<I>(*CONNECT_URL.read())
+}
+
+pub trait RtcSuspend<T> {
+    fn rtc_suspend(&self) -> Result<MappedSignal<T>, RenderError>;
+}
+
+impl<T: Clone, E: std::fmt::Debug + Clone> RtcSuspend<T> for Resource<Result<T, E>> {
+    fn rtc_suspend(&self) -> Result<MappedSignal<T>, RenderError> {
+        match self.suspend() {
+            Ok(v) => match &*v.read() {
+                Ok(_) => Ok(v.clone().map(|r| r.as_ref().expect("Must be"))),
+                Err(_e) => Err(RenderError::default()), // TODO: Make real error msg
+            },
+            Err(s) => Err(s),
+        }
+    }
 }

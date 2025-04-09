@@ -1,10 +1,10 @@
+use crate::fixture::blueprint::units::Percentage;
+use crate::{MaybeLinear, SavePercentage};
+use either::Either;
+use entities::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
-use either::Either;
-use serde::{Deserialize, Serialize};
-use crate::{MaybeLinear, SavePercentage};
-use entities::*;
-use crate::fixture::blueprint::units::Percentage;
 
 pub mod entities;
 pub mod units;
@@ -16,10 +16,10 @@ pub struct FixtureBlueprint {
     pub channels: HashMap<ChannelIdentifier, Channel>,
     pub modes: Vec<Mode>,
     pub matrix: Option<PixelMatrix>,
-    pub wheels: Option<Vec<()>>
+    pub wheels: Option<Vec<()>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Metadata {
     pub name: String,
     pub identifier: String,
@@ -32,12 +32,16 @@ pub type PixelGroupIdentifier = String;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PixelMatrix {
     pub pixels: Vec<Vec<Vec<Option<Pixel>>>>,
-    pub groups: Vec<PixelGroupIdentifier>
+    pub groups: Vec<PixelGroupIdentifier>,
 }
 
 impl PixelMatrix {
     pub fn dimensions(&self) -> [usize; 3] {
-        [self.pixels.len(), self.pixels[0].len(),  self.pixels[0][0].len()]
+        [
+            self.pixels.len(),
+            self.pixels[0].len(),
+            self.pixels[0][0].len(),
+        ]
     }
 }
 
@@ -52,14 +56,14 @@ pub enum PixelIdentifier {
     Pixel(usize, usize, usize),
     Group(PixelGroupIdentifier),
     #[default]
-    Master
+    Master,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Physical {
-     /// width, height, depth (in mm)
+    /// width, height, depth (in mm)
     pub dimensions: Option<[f32; 3]>,
-     /// in kg
+    /// in kg
     pub weight: f32,
     /// in Watt
     pub power_consumption: f32,
@@ -95,7 +99,7 @@ pub enum Channel {
 pub struct CommonChannel {
     #[serde(default = "default_percentage")]
     pub default_value: SavePercentage,
-    pub capabilities: Vec<Capability>
+    pub capabilities: Vec<Capability>,
 }
 
 fn default_percentage() -> SavePercentage {
@@ -138,26 +142,26 @@ pub enum CapabilityKind {
     },
     ColorPreset {
         colors: MaybeLinear<Vec<DynamicColor>>,
-        color_temperature: Option<MaybeLinear<ColorTemperature>>
+        color_temperature: Option<MaybeLinear<ColorTemperature>>,
     },
     ColorTemperature {
         temperature: MaybeLinear<ColorTemperature>,
     },
     Pan {
-        angle: MaybeLinear<RotationAngle>
+        angle: MaybeLinear<RotationAngle>,
     },
     PanContinuous {
         speed: MaybeLinear<RotationSpeed>,
     },
     Tilt {
-        angle: MaybeLinear<RotationAngle>
+        angle: MaybeLinear<RotationAngle>,
     },
     TiltContinuous {
         speed: MaybeLinear<RotationSpeed>,
     },
     PanTiltSpeed {
         speed: Option<MaybeLinear<Speed>>,
-        duration: Option<MaybeLinear<Time>>
+        duration: Option<MaybeLinear<Time>>,
     },
     WheelSlot {
         wheel: Option<String>,
@@ -188,7 +192,7 @@ pub enum CapabilityKind {
         sensitivity: MaybeLinear<Percentage>,
     },
     BeamAngle {
-        angle: MaybeLinear<BeamAngle>
+        angle: MaybeLinear<BeamAngle>,
     },
     BeamPosition {
         horizontal_angle: Option<MaybeLinear<HorizontalAngle>>,
@@ -198,29 +202,29 @@ pub enum CapabilityKind {
         distance: MaybeLinear<Distance>,
     },
     Zoom {
-        angle: MaybeLinear<BeamAngle>
+        angle: MaybeLinear<BeamAngle>,
     },
     Iris {
         open_percent: MaybeLinear<IrisPercent>,
     },
     IrisEffect {
         name: String,
-        speed: Option<MaybeLinear<Speed>>
+        speed: Option<MaybeLinear<Speed>>,
     },
     Frost {
         intensity: MaybeLinear<Percentage>,
     },
     FrostEffect {
         name: String,
-        speed: Option<MaybeLinear<Speed>>
+        speed: Option<MaybeLinear<Speed>>,
     },
     Prism {
         speed: Option<MaybeLinear<RotationSpeed>>,
-        angle: Option<MaybeLinear<RotationAngle>>
+        angle: Option<MaybeLinear<RotationAngle>>,
     },
     PrismRotation {
         speed: Option<MaybeLinear<RotationSpeed>>,
-        angle: Option<MaybeLinear<RotationAngle>>
+        angle: Option<MaybeLinear<RotationAngle>>,
     },
     //TODO: Implement
     BladeInsertion,
@@ -234,10 +238,10 @@ pub enum CapabilityKind {
         output: MaybeLinear<FogOutput>,
     },
     FogType {
-        kind: FogKind
+        kind: FogKind,
     },
     Rotation {
-       speed: Option<MaybeLinear<RotationSpeed>>,
+        speed: Option<MaybeLinear<RotationSpeed>>,
         angle: Option<MaybeLinear<RotationAngle>>,
     },
     Speed {
@@ -248,10 +252,9 @@ pub enum CapabilityKind {
     },
     Maintenance {
         parameter: Option<MaybeLinear<Parameter>>,
-        hold: Option<Time>
-    }
+        hold: Option<Time>,
+    },
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mode {

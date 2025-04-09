@@ -1,9 +1,13 @@
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
+use crate::{AServiceImpl, ServiceImpl};
 use log::error;
 use mlc_communication::remoc::rtc::ServerBase;
 use mlc_communication::remoc::{self, prelude::*};
+use mlc_communication::services::general::GeneralServiceIdent;
+use mlc_communication::services::project::ProjectServiceIdent;
+use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
 use mlc_communication::{ServiceIdentifiable, ServiceIdentifiableServer, services::*};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
@@ -11,10 +15,6 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use mlc_communication::services::general::GeneralServiceIdent;
-use mlc_communication::services::project::ProjectServiceIdent;
-use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
-use crate::{AServiceImpl, ServiceImpl};
 
 pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: CancellationToken) {
     log::info!("Starting Server...");
@@ -73,17 +73,17 @@ fn handle_connection(
 
         match buffer {
             ProjectSelectionServiceIdent::IDENT => {
-                ProjectSelectionServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
-                .await
-                .unwrap();
+                ProjectSelectionServiceIdent::spinup(service_obj, socket_rx, socket_tx)
+                    .await
+                    .unwrap();
             }
             GeneralServiceIdent::IDENT => {
-                GeneralServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
+                GeneralServiceIdent::spinup(service_obj, socket_rx, socket_tx)
                     .await
                     .unwrap();
             }
             ProjectServiceIdent::IDENT => {
-                ProjectServiceIdent::spinup(service_obj,  socket_rx, socket_tx)
+                ProjectServiceIdent::spinup(service_obj, socket_rx, socket_tx)
                     .await
                     .unwrap();
             }
@@ -92,24 +92,4 @@ fn handle_connection(
             }
         }
     });
-}
-
-async fn create<T: Send + Sync + 'static, S: ServerShared<T, remoc::codec::Default>>(
-    service_obj: Arc<T>,
-    socket_rx: OwnedReadHalf,
-    socket_tx: OwnedWriteHalf,
-    ident: String,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    <S as ServerBase>::Client: RemoteSend + Clone,
-{
-    let (server, client) = S::new(service_obj, 1);
-
-    remoc::Connect::io(remoc::Cfg::default(), socket_rx, socket_tx)
-        .provide(client)
-        .await?;
-
-    server.serve(true).await?;
-    log::info!("Closing connection for ident: {}", ident);
-    Ok(())
 }

@@ -1,19 +1,18 @@
-use std::net::Shutdown;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::project::create_default_project;
 use log::{debug, error, info, trace, warn};
-use tokio::io::AsyncWriteExt;
-use tokio::select;
-use mlc_communication::remoc::prelude::*;
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
-use crate::project::create_default_project;
 use mlc_communication::services::general::{Alive, View};
-use mlc_communication::{self as com, remoc};
-use project::Project;
+use mlc_communication::{self as com, remoc::prelude::*};
+use mlc_data::misc::ErrIgnore;
+use mlc_ofl::OflLibrary;
+use project::{Project, get_base_app_dir};
 use server::setup_server;
+use tokio::select;
 use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -30,7 +29,8 @@ pub struct ServiceImpl {
     valid_project: RwLock<bool>,
     info: Sender<Info>,
     status: Sender<String>,
-    adapt_notifier: Arc<Notify>
+    adapt_notifier: Arc<Notify>,
+    ofl_library: mlc_ofl::OflLibrary,
 }
 pub type AServiceImpl = Arc<ServiceImpl>;
 
@@ -72,14 +72,17 @@ async fn main() {
     let project = Arc::new(RwLock::new(create_default_project()));
     let adapt_notifier = Arc::new(Notify::new());
 
+    let lib_path = get_base_app_dir().join("library");
+    tokio::fs::create_dir_all(&lib_path).await.ignore();
+
     let service_obj = Arc::new(ServiceImpl {
         project,
         valid_project: RwLock::new(false),
         info: rch::watch::channel(Info::Idle).0,
         status: rch::watch::channel(String::new()).0,
-        adapt_notifier: adapt_notifier.clone()
+        adapt_notifier: adapt_notifier.clone(),
+        ofl_library: OflLibrary::create(lib_path.join("ofl.json")),
     });
-
 
     let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
@@ -93,7 +96,11 @@ async fn main() {
         service_obj.clone(),
         task_cancel_token.clone(),
     ));
-    task_handles.spawn(autosave_service(service_obj.clone(), adapt_notifier.clone(), task_cancel_token.clone()));
+    task_handles.spawn(autosave_service(
+        service_obj.clone(),
+        adapt_notifier.clone(),
+        task_cancel_token.clone(),
+    ));
 
     let should_tui_exit = Arc::new(RwLock::new(false));
     let tui_handle = tokio::spawn(create_tui(
@@ -118,10 +125,7 @@ async fn main() {
     tui_handle.await.unwrap();
 }
 
-async fn create_shutdown_notifier(
-    obj: AServiceImpl,
-    task_cancel_token: CancellationToken,
-) {
+async fn create_shutdown_notifier(obj: AServiceImpl, task_cancel_token: CancellationToken) {
     task_cancel_token.cancelled().await;
 
     let mut p = obj.project.write().await;
@@ -151,9 +155,11 @@ where
     }
 }
 
-
-async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>, shutdown: CancellationToken) {
-
+async fn autosave_service(
+    service_obj: AServiceImpl,
+    adapt_notifier: Arc<Notify>,
+    shutdown: CancellationToken,
+) {
     fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         if valid {
             if let Some(d) = &p.settings.autosave {
@@ -167,7 +173,10 @@ async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>
     }
 
     loop {
-        let duration = save_fut(&*service_obj.project.read().await, *service_obj.valid_project.read().await);
+        let duration = save_fut(
+            &*service_obj.project.read().await,
+            *service_obj.valid_project.read().await,
+        );
 
         select! {
             _ = adapt_notifier.notified() => {
@@ -186,4 +195,3 @@ async fn autosave_service(service_obj: AServiceImpl, adapt_notifier: Arc<Notify>
         tokio::task::yield_now().await;
     }
 }
-

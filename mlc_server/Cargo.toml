@@ -9,6 +9,7 @@ edition.workspace = true
 tokio.workspace = true
 tokio-util = "0.7.14"
 mlc_communication = { path = "../mlc_communication" }
+mlc_ofl = { path = "../mlc_ofl" }
 mlc_data = { path = "../mlc_data" }
 log.workspace = true
 fern = { version = "0.7", features = ["colored"] }
