@@ -1,12 +1,11 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
 pub use remoc;
 use remoc::prelude::*;
+use std::sync::Arc;
 
 use macro_rules_attribute::derive_alias;
+use mlc_data::DynamicResult;
 use remoc::rtc::ServerBase;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use mlc_data::DynamicResult;
 
 derive_alias! {
     #[derive(Serde!)] = #[derive(serde::Serialize, serde::Deserialize)];
@@ -22,15 +21,18 @@ pub trait ServiceIdentifiable {
     type Client: Client + RemoteSend + Clone;
 }
 
-pub trait ServiceIdentifiableServer<T: Send + Sync + 'static>: ServiceIdentifiable  {
+pub trait ServiceIdentifiableServer<T: Send + Sync + 'static>: ServiceIdentifiable {
     type S;
 
-    async fn spinup(service: Arc<T>, socket_rx: OwnedReadHalf, socket_tx: OwnedWriteHalf) -> DynamicResult<()>
-        where
-            <Self as ServiceIdentifiableServer<T>>::S: ServerBase,
-            <<Self as ServiceIdentifiableServer<T>>::S as ServerBase>::Client: Clone,
-            <Self as ServiceIdentifiableServer<T>>::S: ServerShared<T, remoc::codec::Default>,
-            <<Self as ServiceIdentifiableServer<T>>::S as ServerBase>::Client: RemoteSend,
+    async fn spinup(
+        service: Arc<T>,
+        socket_rx: OwnedReadHalf,
+        socket_tx: OwnedWriteHalf,
+    ) -> DynamicResult<()>
+    where
+        <Self as ServiceIdentifiableServer<T>>::S: ServerBase,
+        <Self as ServiceIdentifiableServer<T>>::S: ServerShared<T, remoc::codec::Default>,
+        <<Self as ServiceIdentifiableServer<T>>::S as ServerBase>::Client: Clone + RemoteSend,
     {
         let (server, client) = Self::S::new(service, 1);
 
@@ -39,7 +41,10 @@ pub trait ServiceIdentifiableServer<T: Send + Sync + 'static>: ServiceIdentifiab
             .await?;
 
         server.serve(true).await?;
-        log::info!("Closing connection for ident: {}", String::from_utf8_lossy(&Self::IDENT).to_string());
+        log::info!(
+            "Closing connection for ident: {}",
+            String::from_utf8_lossy(&Self::IDENT).to_string()
+        );
         Ok(())
     }
 }

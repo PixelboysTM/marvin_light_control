@@ -34,7 +34,7 @@ pub enum UseServiceState<T> {
     Errored(Box<dyn std::error::Error>),
 }
 
-pub type SClient<S: ServiceIdentifiable> = Memo<UniqueEq<S::Client>>;
+pub type SClient<S> = Memo<UniqueEq<<S as ServiceIdentifiable>::Client>>;
 
 pub fn use_service_url<I: ServiceIdentifiable>(
     addr: (Ipv4Addr, u16),
