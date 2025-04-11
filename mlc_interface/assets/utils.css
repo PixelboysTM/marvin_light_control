@@ -58,7 +58,7 @@ dialog.modalDialog {
     transition: transform 150ms ease-out;
 
     @starting-style {
-        transform:  translateY(100%);
+        transform: translateY(100%);
     }
 
     &::backdrop {
@@ -69,9 +69,11 @@ dialog.modalDialog {
 
     form.dialogForm {
         min-width: 30vw;
+        min-height: 30vh;
         height: fit-content;
         width: fit-content;
-        min-height: 30vh;
+        max-width: 80vw;
+        max-height: 90vh;
         margin: 0.25rem;
         padding: 0;
 
@@ -101,6 +103,12 @@ dialog.modalDialog {
                 height: 2rem;
                 border-radius: 50%;
             }
+
+        }
+
+        .content {
+            width: 100%;
+            height: 100%;
         }
     }
 }
