@@ -252,3 +252,23 @@ impl<T> From<T> for UniqueEq<T> {
         }
     }
 }
+
+pub struct SignalNotify(GlobalSignal<()>);
+
+impl Deref for SignalNotify {
+    type Target = GlobalSignal<()>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl SignalNotify {
+    pub const fn create() -> Self {
+        Self(Signal::global(|| ()))
+    }
+
+    pub fn update(&self) {
+        *self.0.write() = ()
+    }
+}

@@ -1,4 +1,5 @@
-use crate::utils::{navigate, Branding, IconButton, Screen};
+use crate::screens::BLUEPRINTS_CHANGED;
+use crate::utils::{navigate, Branding, IconButton, ModalResult, Screen};
 use connect::{connect_url, use_service, RtcSuspend, SClient};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
@@ -6,9 +7,10 @@ use dioxus::{desktop::Config, logger::tracing::error};
 use dioxus_free_icons::icons::ld_icons::{
     LdCloudUpload, LdCog, LdLamp, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
 };
+use itertools::Itertools;
 use log::{info, warn};
-use mlc_communication::services::general::View as SView;
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
+use mlc_communication::services::general::{ProjectInfo, View as SView};
 use mlc_communication::services::project::{
     ProjectService, ProjectServiceClient, ProjectServiceIdent,
 };
@@ -171,7 +173,7 @@ fn View() -> Element {
     rsx! { "View" }
 }
 
-const ADD_FIXTURE_MODAL: Symbol = Symbol::create("add-fixture-modal");
+pub const ADD_FIXTURE_MODAL: Symbol = Symbol::create("add-fixture-modal");
 
 const PROJECT_COMMON: Asset = asset!("/assets/project_common.css");
 const CONFIGURE: Asset = asset!("/assets/configure.css");
@@ -211,7 +213,7 @@ fn ProjectLayout() -> Element {
             select! {
                 Ok(_) = info_sub.changed() => {
                     let info = info_sub.borrow_and_update().unwrap();
-                    match *info {
+                    match &*info {
                         Info::Autosaved => {
                             ToastInfo::info("Autosaved", "The backend autosaved").post();
                         }
@@ -222,6 +224,14 @@ fn ProjectLayout() -> Element {
                         Info::Idle => {}
                         Info::Saved => {
                             ToastInfo::info("Saved", "The project was successfully written to disk!").post();
+                        }
+                        Info::Warning {title, msg} => {
+                            ToastInfo::warn(title, msg).post();
+                        }
+                        Info::ProjectInfo{info: pi } => match pi {
+                            ProjectInfo::BlueprintsChanged => {
+                                BLUEPRINTS_CHANGED.update();
+                            }
                         }
                     }
                 }
@@ -241,8 +251,6 @@ fn ProjectLayout() -> Element {
             *delay.write() = instant.elapsed().as_millis() as u64;
         }
     });
-
-    let prj_service = use_service::<ProjectServiceIdent>()?;
 
     let r: Route = use_route();
     let extra_actions = match r {
@@ -310,7 +318,9 @@ fn ProjectLayout() -> Element {
                         icon: LdSave,
                         onclick: move |_| async move {
                             info!("Saving");
-                            let _ = prj_service.read().save().await;
+                            if let Ok(false) = gen_client.read().save().await {
+                                ToastInfo::warn("Wrong save", "Save requested, when no project was loaded!").post();
+                            }
                         },
                     }
                 }
@@ -318,62 +328,7 @@ fn ProjectLayout() -> Element {
             Outlet::<Route> {}
             footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read())} }
 
-            Modal {
-                title: "Fixture Explorer",
-                ident: ADD_FIXTURE_MODAL,
-                variant: ModalVariant::OkCancel,
-                icon: LdLamp,
-                oktext: "Import",
-                onexit: move |a| {},
-                AddFixtureBlueprintModal { project: prj_service }
-            }
-        }
-    }
-}
 
-#[component]
-fn AddFixtureBlueprintModal(project: SClient<ProjectServiceIdent>) -> Element {
-    let available_projects =
-        use_resource(
-            move || async move { project.read().list_available_fixture_blueprints().await },
-        )
-        .rtc_suspend()?;
-
-    let mut search = use_signal(|| "".to_string());
-
-    let filtered_projects = use_memo(move || {
-        let matcher = fuzzy_matcher::skim::SkimMatcherV2::default();
-        available_projects
-            .read()
-            .iter()
-            .filter(|p| {
-                if search.read().is_empty() {
-                    true
-                } else {
-                    matcher
-                        .fuzzy(&p.meta.identifier, &*search.read(), false)
-                        .map(|(s, _)| s > 0)
-                        .unwrap_or(false)
-                }
-            })
-            .cloned()
-            .collect::<Vec<_>>()
-    });
-
-    rsx! {
-        input {
-            value: search(),
-            oninput: move |v| {
-                search.set(v.value());
-            },
-        }
-        div { class: "list",
-            for p in filtered_projects() {
-                div { class: "blueprint",
-                    h1 { {p.meta.name.clone()} }
-                    code { {p.meta.identifier.clone()} }
-                }
-            }
         }
     }
 }

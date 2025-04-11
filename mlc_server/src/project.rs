@@ -1,9 +1,9 @@
-use crate::ServiceImpl;
 use crate::project::project_loader::Plm;
+use crate::ServiceImpl;
 use chrono::Local;
 use log::{error, info, warn};
 use mlc_communication::remoc::rtc;
-use mlc_communication::services::general::Info;
+use mlc_communication::services::general::{Info, ProjectInfo};
 use mlc_communication::services::project::{
     FixtureBlueprintHead, ProjectService, ProjectServiceError,
 };
@@ -13,9 +13,9 @@ use mlc_communication::services::project_selection::{
 use mlc_data::misc::ErrIgnore;
 use mlc_data::project::{ProjectSettings, ToFileName};
 use mlc_data::{
-    DynamicResult,
     fixture::blueprint::FixtureBlueprint,
     project::{ProjectMetadata, ProjectType},
+    DynamicResult,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -34,17 +34,6 @@ pub struct Project {
 
 #[rtc::async_trait]
 impl ProjectService for ServiceImpl {
-    async fn save(&self) -> Result<(), ProjectServiceError> {
-        let mut p = self.validate_project_mut().await?;
-        p.save().await.map_err(ProjectServiceError::SavingFailed)?;
-
-        self.info.send(Info::Saved).ignore();
-        self.status
-            .send(format!("Saved Project '{}' to disk!", p.metadata.name))
-            .ignore();
-
-        Ok(())
-    }
     async fn list_available_fixture_blueprints(
         &self,
     ) -> Result<Vec<FixtureBlueprintHead>, ProjectServiceError> {
@@ -65,6 +54,48 @@ impl ProjectService for ServiceImpl {
             .collect::<Vec<_>>();
 
         Ok(heads)
+    }
+
+    async fn import_fixture_blueprints(
+        &self,
+        identifiers: Vec<String>,
+    ) -> Result<(), ProjectServiceError> {
+        let mut blueprints = self
+            .ofl_library
+            .read(Some(|s| {
+                info!("OflLoadMsg: {s}");
+                self.status.send(s).ignore();
+            }))
+            .await
+            .map_err(|e| ProjectServiceError::BlueprintListFailed(e.to_string()))?
+            .into_iter()
+            .filter(|b| identifiers.contains(&b.meta.identifier))
+            .collect::<Vec<_>>();
+
+        if blueprints.len() != identifiers.len() {
+            self.info
+                .send(Info::Warning {
+                    title: "Blueprints not found".to_string(),
+                    msg: "Not all specified blueprints could be found".to_string(),
+                })
+                .ignore();
+        }
+        let mut p = self.project.write().await;
+
+        p.blueprints
+            .retain(|b| !identifiers.contains(&b.meta.identifier));
+        p.blueprints.append(&mut blueprints);
+        p.blueprints.sort_by(|b1, b2| b1.meta.identifier.cmp(&b2.meta.identifier));
+
+        self.info
+            .send(ProjectInfo::BlueprintsChanged.into())
+            .ignore();
+
+        Ok(())
+    }
+
+    async fn list_blueprints(&self) -> Result<Vec<FixtureBlueprint>, ProjectServiceError> {
+        Ok(self.project.read().await.blueprints.clone())
     }
 }
 

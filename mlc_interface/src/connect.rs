@@ -1,4 +1,5 @@
 use dioxus::hooks::use_signal;
+use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use dioxus::signals::{Readable, Signal};
 use mlc_communication::remoc::ConnectExt;
@@ -82,7 +83,10 @@ impl<T: Clone, E: std::fmt::Debug + Clone> RtcSuspend<T> for Resource<Result<T, 
         match self.suspend() {
             Ok(v) => match &*v.read() {
                 Ok(_) => Ok(v.clone().map(|r| r.as_ref().expect("Must be"))),
-                Err(_e) => Err(RenderError::default()), // TODO: Make real error msg
+                Err(e) => {
+                    error!("Making fake msg: {e:?}");
+                    Err(RenderError::default())
+                } // TODO: Make real error msg
             },
             Err(s) => Err(s),
         }

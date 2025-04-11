@@ -13,13 +13,73 @@
 
     display: grid;
     grid-template-rows: auto 1fr;
+    width: 50vw;
+    overflow: hidden;
 
     input {
         width: 100%;
     }
 
     .list {
-        height: 100%;
+        height: 60vh;
+        width: 100%;
         overflow-y: auto;
+        padding: var(--space);
+
+        .blueprint {
+            border: 1px solid var(--c-p);
+            padding: var(--space);
+            border-radius: var(--br);
+            margin-bottom: calc(var(--space) * 2);
+            position: relative;
+
+            input.import {
+                position: absolute;
+                top: var(--space);
+                right: var(--space);
+                width: 2rem;
+            }
+
+            h1 {
+                font-size: 1.15rem;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+
+            code {
+                font-style: italic;
+                color: var(--c-disabled);
+                padding: 0;
+            }
+
+            details {
+                border-top: 1px solid var(--c-p);
+                padding-top: var(--space);
+                padding-bottom: var(--space);
+
+                p {
+                    padding: 0 0 0 calc(var(--space) * 4);
+                    margin: 0;
+                }
+
+                .modes {
+
+                    span:nth-child(3n + 2) {
+                        color: var(--c-p);
+                    }
+
+                    span:nth-child(3n + 1) {
+                        color: var(--c-s);
+                    }
+
+                    span:nth-child(3n) {
+                        color: var(--c-t);
+                    }
+
+
+                }
+            }
+
+        }
     }
 }

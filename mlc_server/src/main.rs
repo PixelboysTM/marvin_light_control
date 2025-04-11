@@ -5,6 +5,7 @@ use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
+use mlc_communication::services::project::ProjectServiceError;
 use mlc_communication::{self as com, remoc::prelude::*};
 use mlc_data::misc::ErrIgnore;
 use mlc_data::DynamicResult;
@@ -73,6 +74,27 @@ impl com::services::general::GeneralService for ServiceImpl {
     async fn status(&self) -> Result<Receiver<String>, CallError> {
         let rx = self.status.subscribe();
         Ok(rx)
+    }
+    async fn save(&self) -> Result<bool, CallError> {
+        let mut p = match self.validate_project_mut().await {
+            Ok(p) => p,
+            Err(_e) => return Ok(false),
+        };
+        if let Err(e) = p.save().await.map_err(ProjectServiceError::SavingFailed) {
+            self.info
+                .send(Info::Warning {
+                    title: "Failed to save".to_string(),
+                    msg: e.to_string(),
+                })
+                .ignore();
+        }
+
+        self.info.send(Info::Saved).ignore();
+        self.status
+            .send(format!("Saved Project '{}' to disk!", p.metadata.name))
+            .ignore();
+
+        Ok(true)
     }
 }
 

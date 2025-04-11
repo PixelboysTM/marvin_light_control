@@ -2,6 +2,7 @@ pub mod general {
     use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use macro_rules_attribute::derive;
 
+    use crate::services::project::ProjectServiceError;
     use remoc::{rch::watch, rtc};
 
     pub struct GeneralServiceIdent;
@@ -31,6 +32,19 @@ pub mod general {
         Shutdown,
         Saved,
         Autosaved,
+        Warning { title: String, msg: String },
+        ProjectInfo { info: ProjectInfo },
+    }
+
+    #[derive(Com!)]
+    pub enum ProjectInfo {
+        BlueprintsChanged,
+    }
+
+    impl From<ProjectInfo> for Info {
+        fn from(value: ProjectInfo) -> Self {
+            Self::ProjectInfo { info: value }
+        }
     }
 
     #[rtc::remote]
@@ -39,6 +53,7 @@ pub mod general {
         async fn is_valid_view(&self, view: View) -> Result<bool, rtc::CallError>;
         async fn info(&self) -> Result<watch::Receiver<Info>, rtc::CallError>;
         async fn status(&self) -> Result<watch::Receiver<String>, rtc::CallError>;
+        async fn save(&self) -> Result<bool, rtc::CallError>;
     }
 }
 
@@ -94,7 +109,7 @@ pub mod project_selection {
 
 pub mod project {
     use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
-    use mlc_data::fixture::blueprint::Metadata;
+    use mlc_data::fixture::blueprint::{FixtureBlueprint, Metadata};
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
 
@@ -119,10 +134,14 @@ pub mod project {
 
     #[rtc::remote]
     pub trait ProjectService {
-        async fn save(&self) -> Result<(), ProjectServiceError>;
         async fn list_available_fixture_blueprints(
             &self,
         ) -> Result<Vec<FixtureBlueprintHead>, ProjectServiceError>;
+        async fn import_fixture_blueprints(
+            &self,
+            identifiers: Vec<String>,
+        ) -> Result<(), ProjectServiceError>;
+        async fn list_blueprints(&self) -> Result<Vec<FixtureBlueprint>, ProjectServiceError>;
     }
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize, Clone)]

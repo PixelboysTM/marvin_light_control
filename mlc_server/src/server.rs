@@ -8,10 +8,10 @@ use mlc_communication::remoc::{self, prelude::*};
 use mlc_communication::services::general::GeneralServiceIdent;
 use mlc_communication::services::project::ProjectServiceIdent;
 use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
-use mlc_communication::{ServiceIdentifiable, ServiceIdentifiableServer, services::*};
+use mlc_communication::{services::*, ServiceIdentifiable, ServiceIdentifiableServer};
 use tokio::io::AsyncReadExt;
-use tokio::net::TcpListener;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpListener;
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
@@ -71,25 +71,24 @@ fn handle_connection(
         //     Box::new(project::ProjectServiceIdent),
         // ];
 
-        match buffer {
+        let r = match buffer {
             ProjectSelectionServiceIdent::IDENT => {
-                ProjectSelectionServiceIdent::spinup(service_obj, socket_rx, socket_tx)
-                    .await
-                    .unwrap();
+                ProjectSelectionServiceIdent::spinup(service_obj, socket_rx, socket_tx).await
             }
             GeneralServiceIdent::IDENT => {
-                GeneralServiceIdent::spinup(service_obj, socket_rx, socket_tx)
-                    .await
-                    .unwrap();
+                GeneralServiceIdent::spinup(service_obj, socket_rx, socket_tx).await
             }
             ProjectServiceIdent::IDENT => {
-                ProjectServiceIdent::spinup(service_obj, socket_rx, socket_tx)
-                    .await
-                    .unwrap();
+                ProjectServiceIdent::spinup(service_obj, socket_rx, socket_tx).await
             }
             _ => {
                 log::error!("Identifier was not valid!");
+                return;
             }
+        };
+        
+        if let Err(e) = r {
+            error!("{}", e);
         }
     });
 }

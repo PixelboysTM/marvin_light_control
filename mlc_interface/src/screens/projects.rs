@@ -1,16 +1,24 @@
 use crate::connect::connect;
 use crate::toaster::ToastInfo;
-use crate::utils::{navigate, Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Screen, Symbol};
+use crate::utils::{
+    navigate, Branding, IconButton, Loader, Modal, ModalResult, ModalVariant, Screen, Symbol,
+};
 use dioxus::logger::tracing::{info, warn};
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash, LdTriangleAlert};
+use dioxus_free_icons::icons::ld_icons::{
+    LdFileArchive, LdFileJson, LdLightbulb, LdPen, LdPencilRuler, LdPlus, LdSave, LdTrash,
+    LdTriangleAlert,
+};
 use dioxus_free_icons::Icon;
 use log::error;
 use mlc_communication::services::general::{
     GeneralService, GeneralServiceIdent, Info, View as GenView,
 };
+use mlc_communication::services::project_selection::{
+    ProjectIdent, ProjectSelectionService, ProjectSelectionServiceClient,
+    ProjectSelectionServiceIdent,
+};
 use mlc_data::project::{ProjectMetadata, ProjectType, ToFileName};
-use mlc_communication::services::project_selection::{ProjectIdent, ProjectSelectionService, ProjectSelectionServiceClient, ProjectSelectionServiceIdent};
 
 const PROJECTS_CSS: Asset = asset!("/assets/projects.css");
 
@@ -47,7 +55,7 @@ pub fn Projects() -> Element {
 
                 let i = info.borrow_and_update().expect("Failed");
 
-                match *i {
+                match &*i {
                     Info::Idle => {
                         warn!("Info Idle")
                     }
@@ -59,14 +67,28 @@ pub fn Projects() -> Element {
                         ToastInfo::info("Autosaved", "The backend autosaved.").post();
                     }
                     Info::Saved => {
-                        ToastInfo::warn("Saved", "The project was successfully written to disk! But why here?").post();
+                        ToastInfo::warn(
+                            "Saved",
+                            "The project was successfully written to disk! But why here?",
+                        )
+                        .post();
+                    }
+                    Info::Warning { title, msg } => {
+                        ToastInfo::warn(title, msg).post();
+                    }
+                    Info::ProjectInfo { .. } => {
+                        ToastInfo::info("ProjectInfo", "Why here ProjectInfo?").post();
                     }
                 }
             }
         }
     });
 
-    let service = use_resource::<ProjectSelectionServiceClient, _>(async || connect::<ProjectSelectionServiceIdent>().await.expect("Handling of connection loss not yet implemented"));
+    let service = use_resource::<ProjectSelectionServiceClient, _>(async || {
+        connect::<ProjectSelectionServiceIdent>()
+            .await
+            .expect("Handling of connection loss not yet implemented")
+    });
 
     let service_suspend = service.suspend()?;
     let s2 = service_suspend.clone();
@@ -82,7 +104,6 @@ pub fn Projects() -> Element {
     });
 
     let projects_suspend = projects.suspend()?;
-    let p2 = projects_suspend.clone();
 
     let mut new_project_name = use_signal(|| "New Project".to_string());
     let mut new_project_type = use_signal(|| ProjectType::Json);
@@ -199,7 +220,10 @@ pub fn Projects() -> Element {
 }
 
 #[component]
-fn ProjectList(projects: MappedSignal<Vec<ProjectMetadata>>, onopen: EventHandler<ProjectIdent>) -> Element {
+fn ProjectList(
+    projects: MappedSignal<Vec<ProjectMetadata>>,
+    onopen: EventHandler<ProjectIdent>,
+) -> Element {
     rsx! {
         div { class: "projectList",
             for p in projects().into_iter() {
@@ -216,7 +240,7 @@ fn ProjectList(projects: MappedSignal<Vec<ProjectMetadata>>, onopen: EventHandle
 
 #[component]
 fn ProjectListItem(item: ProjectMetadata, onopen: EventHandler) -> Element {
-    rsx!{
+    rsx! {
         div {
             class: "project",
             ondoubleclick: move |_| {

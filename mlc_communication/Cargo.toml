@@ -19,5 +19,5 @@ serde_json = "1.0.139"
 remoc = { version = "^0.15", default-features = false, features = [
     "full",
     "codec-bincode",
-    "default-codec-bincode2",
+    "default-codec-json",
 ] }
