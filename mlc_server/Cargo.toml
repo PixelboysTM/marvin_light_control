@@ -26,3 +26,5 @@ json5.workspace = true
 directories.workspace = true
 futures = "0.3.31"
 lazy_static = "1.5.0"
+textwrap = "0.16.2"
+unicode-width = "0.2.0"

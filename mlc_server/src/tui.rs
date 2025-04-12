@@ -15,6 +15,7 @@ use ratatui::{
     Frame,
 };
 use std::{io, sync::Arc, time::Duration};
+use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tui_logger::{ExtLogRecord, LogFormatter};
@@ -41,6 +42,7 @@ pub async fn create_tui(
                 paragraphs: Text::default(),
                 scroll: 0,
                 scroll_state: ScrollbarState::default(),
+                last_total_height: 0,
             },
         },
     }
@@ -68,6 +70,7 @@ pub struct LogWidgetState {
     paragraphs: Text<'static>,
     scroll: usize,
     scroll_state: ScrollbarState,
+    last_total_height: usize,
 }
 
 pub struct LogWidget;
@@ -80,16 +83,16 @@ impl StatefulWidget for LogWidget {
         let block = Block::bordered().title("LOG").border_set(border::ROUNDED);
 
         let remaining_height = block.inner(area).height as usize;
+        let total_height =
+            calculate_wrapped_paragraph_height(&state.paragraphs, block.inner(area).width) as usize;
+        
+        let to_scroll = total_height.saturating_sub(state.last_total_height);
 
-        state.scroll_state = state.scroll_state.content_length(
-            state
-                .paragraphs
-                .lines
-                .len()
-                .saturating_sub(remaining_height),
-        );
+        state.scroll_state = state
+            .scroll_state
+            .content_length(total_height.saturating_sub(remaining_height));
 
-        state.scroll = state.scroll.min(state.paragraphs.lines.len()).max(0);
+        state.scroll = state.scroll.saturating_add(to_scroll).min(total_height).max(0);
         state.scroll_state = state.scroll_state.position(state.scroll);
 
         Paragraph::new(state.paragraphs.clone())
@@ -109,7 +112,36 @@ impl StatefulWidget for LogWidget {
                 buf,
                 &mut state.scroll_state,
             );
+        
+        state.last_total_height = total_height;
     }
+}
+
+pub fn calculate_wrapped_paragraph_height(text: &Text, max_width: u16) -> u16 {
+    let wrap_width = max_width as usize;
+
+    let mut total_lines = 0;
+
+    for line in &text.lines {
+        // Combine spans into a single string with appropriate spacing
+        let mut line_content = String::new();
+        for span in &line.spans {
+            if !line_content.is_empty() {
+                line_content.push(' ');
+            }
+            line_content.push_str(span.content.as_ref());
+        }
+
+        // Use textwrap to wrap the line
+        let options = Options::new(wrap_width)
+            .break_words(false) // try to avoid breaking inside words
+            .word_splitter(textwrap::WordSplitter::NoHyphenation); // proper Unicode-aware word splitting
+
+        let wrapped = wrap(&line_content, &options);
+        total_lines += wrapped.len().max(1); // even empty lines count as 1 visual line
+    }
+
+    total_lines as u16
 }
 
 impl TuiApp {
@@ -153,12 +185,12 @@ impl TuiApp {
             // for (i, line) in s.lines.into_iter().enumerate() {
             //     self.tui_state.log_state.paragraphs.lines.insert(i, line);
             // }
-            self.tui_state.log_state.scroll = self.tui_state.log_state.scroll.saturating_add(len);
-            self.tui_state.log_state.scroll_state = self
-                .tui_state
-                .log_state
-                .scroll_state
-                .position(self.tui_state.log_state.scroll);
+            // self.tui_state.log_state.scroll = self.tui_state.log_state.scroll.saturating_add(len);
+            // self.tui_state.log_state.scroll_state = self
+            //     .tui_state
+            //     .log_state
+            //     .scroll_state
+            //     .position(self.tui_state.log_state.scroll);
         }
 
         if !event::poll(Duration::from_millis(250))? {
