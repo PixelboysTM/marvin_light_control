@@ -11,9 +11,6 @@ use itertools::Itertools;
 use log::{info, warn};
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
 use mlc_communication::services::general::{ProjectInfo, View as SView};
-use mlc_communication::services::project::{
-    ProjectService, ProjectServiceClient, ProjectServiceIdent,
-};
 use screens::{Configure, Program, Projects, Show};
 use std::{
     net::Ipv4Addr,
@@ -60,7 +57,7 @@ fn main() {
             Config::default().with_menu(None).with_window(
                 WindowBuilder::new()
                     .with_maximized(false)
-                    .with_always_on_top(false)
+                    .with_always_on_top(true)
                     .with_inner_size(LogicalSize::new(800, 600))
                     .with_resizable(true)
                     .with_title("Marvin Light Control"),

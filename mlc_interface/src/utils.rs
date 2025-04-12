@@ -210,6 +210,49 @@ pub fn Panel(
     }
 }
 
+pub trait TabItem: PartialEq + Clone {
+    fn get_name(&self) -> String;
+}
+
+pub trait TabController: PartialEq {
+    type Item: TabItem;
+    fn get_options(&self) -> Vec<Self::Item>;
+    fn set(&mut self, option: Self::Item);
+    fn get(&self) -> Self::Item;
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum TabOrientation {
+    Horizontal,
+    Vertical,
+}
+
+#[component]
+pub fn Tabs<T: TabController + 'static>(
+    controller: Signal<T>,
+    orientation: TabOrientation,
+    class: Option<String>,
+) -> Element {
+    rsx! {
+        div {
+            class: format!("tabBar {} {}", match orientation {
+                TabOrientation::Horizontal => " tab-orientation-horizontal",
+                TabOrientation::Vertical => "tab-orientation-vertical",
+            }, class.unwrap_or_default()),
+            for option in controller.read().get_options() {
+                button {
+                    class: if option == controller.read().get() { "selected"},
+                    onclick: move |e| {
+                        controller.write().set(option.clone());
+                        e.prevent_default();
+                    },
+                    {option.get_name()}
+                }
+            }
+        }
+    }
+}
+
 pub struct UniqueEq<T> {
     value: T,
     id: Uuid,

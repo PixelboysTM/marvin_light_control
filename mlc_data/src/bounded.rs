@@ -1,10 +1,11 @@
+use crate::bounded::bounds::Zero;
+use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::{
     fmt::Debug,
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-
-use serde::{Deserialize, Serialize};
 
 pub trait Bounds<T>: Debug {
     const VALUE: T;
@@ -176,6 +177,12 @@ impl<T: PartialOrd, MIN: Bounds<T>, MAX: Bounds<T>, H> PartialOrd<T>
 {
     fn partial_cmp(&self, other: &T) -> Option<std::cmp::Ordering> {
         self.value.partial_cmp(other)
+    }
+}
+
+impl<T: Display, MIN: Bounds<T>, MAX: Bounds<T>, H> Display for BoundedValue<T, MIN, MAX, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
     }
 }
 

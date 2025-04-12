@@ -125,3 +125,33 @@ dialog.modalDialog {
         height: 100%;
     }
 }
+
+.tabBar {
+    &.tab-orientation-horizontal {
+        padding-top: var(--space);
+        border-bottom: 1px solid var(--c-p);
+    }
+
+    &.tab-orientation-vertical {
+        border-right: 1px solid var(--c-p);
+    }
+
+    button {
+        width: auto;
+        padding: 0.25rem 0.5rem;
+        margin: 0 1px 0 0;
+        border-radius: calc(var(--br) * 2) calc(var(--br) * 2) 0 0;
+        background-color: var(--c-bg);
+        color: var(--c-disabled);
+
+        &:hover {
+            border: 2px solid transparent;
+            color: var(--c-p);
+        }
+
+        &.selected {
+            background-color: var(--c-p);
+            color: var(--c-btn);
+        }
+    }
+}

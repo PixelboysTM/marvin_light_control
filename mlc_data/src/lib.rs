@@ -1,23 +1,21 @@
-use std::fmt::Debug;
-use serde::{Deserialize, Serialize};
-use bounded::{
-    BoundedValue,
-    bounds::{DynamicU8, DynamicU16, DynamicU32, One, Zero},
-};
 use crate::misc::ContextError;
+use bounded::{
+    bounds::{DynamicU16, DynamicU32, DynamicU8, One, Zero},
+    BoundedValue,
+};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 pub use uuid;
 
-
 pub mod bounded;
 pub mod fixture;
-pub mod project;
 pub mod misc;
+pub mod project;
 
 pub type DynamicError = Box<dyn std::error::Error>;
 pub type DynamicResult<T> = Result<T, DynamicError>;
 pub type ContextResult<T> = Result<T, ContextError>;
-
 
 pub type SavePercentage = BoundedValue<f32, Zero, One>;
 pub type TrippleDMXValue = BoundedValue<
@@ -114,11 +112,11 @@ impl PercentageDmxExt for SavePercentage {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MaybeLinear<T> where T: Debug + Clone {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MaybeLinear<T>
+where
+    T: Debug + Clone,
+{
     Constant(T),
-    Linear{
-        start: T,
-        end: T,
-    }
+    Linear { start: T, end: T },
 }

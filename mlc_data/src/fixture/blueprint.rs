@@ -9,7 +9,7 @@ use std::ops::RangeInclusive;
 pub mod entities;
 pub mod units;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FixtureBlueprint {
     #[serde(flatten)]
     pub meta: Metadata,
@@ -29,7 +29,7 @@ pub struct Metadata {
 
 pub type PixelGroupIdentifier = String;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PixelMatrix {
     pub pixels: Vec<Vec<Vec<Option<Pixel>>>>,
     pub groups: Vec<PixelGroupIdentifier>,
@@ -45,13 +45,13 @@ impl PixelMatrix {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pixel {
     pub key: String,
     pub groups: Vec<PixelGroupIdentifier>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum PixelIdentifier {
     Pixel(usize, usize, usize),
     Group(PixelGroupIdentifier),
@@ -75,7 +75,7 @@ pub struct Physical {
 
 pub type ChannelIdentifier = String;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "precision")]
 pub enum Channel {
     Single {
@@ -95,7 +95,7 @@ pub enum Channel {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CommonChannel {
     #[serde(default = "default_percentage")]
     pub default_value: SavePercentage,
@@ -106,7 +106,7 @@ fn default_percentage() -> SavePercentage {
     SavePercentage::create(0.0)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Capability {
     pub range: RangeInclusive<SavePercentage>,
     #[serde(default)]
@@ -115,7 +115,7 @@ pub struct Capability {
     #[serde(flatten)]
     pub kind: CapabilityKind,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum CapabilityKind {
     NoFunction,
@@ -256,7 +256,7 @@ pub enum CapabilityKind {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Mode {
     pub name: String,
     pub channels: Vec<Option<ChannelIdentifier>>,
