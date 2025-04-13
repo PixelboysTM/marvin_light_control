@@ -1,6 +1,7 @@
-use std::time::Duration;
 use chrono::{DateTime, Local};
+use std::time::Duration;
 
+pub mod universe;
 
 #[derive(PartialEq, Debug, Clone, Copy, serde::Serialize, serde::Deserialize, Default)]
 pub enum ProjectType {
@@ -8,7 +9,7 @@ pub enum ProjectType {
     Json,
     Binary,
     #[serde(rename = "Omitted")]
-    Invalid
+    Invalid,
 }
 
 impl ProjectType {
@@ -19,7 +20,7 @@ impl ProjectType {
         match self {
             ProjectType::Json => ".json",
             ProjectType::Binary => ".mbp",
-            ProjectType::Invalid => "."
+            ProjectType::Invalid => ".",
         }
     }
 
@@ -85,9 +86,8 @@ pub struct ProjectMetadata {
     pub project_type: ProjectType,
 }
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ProjectSettings {
     pub save_on_quit: bool,
-    pub autosave: Option<Duration>
+    pub autosave: Option<Duration>,
 }

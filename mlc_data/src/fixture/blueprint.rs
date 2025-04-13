@@ -1,5 +1,5 @@
 use crate::fixture::blueprint::units::Percentage;
-use crate::{MaybeLinear, SavePercentage};
+use crate::{D3Vec, MaybeLinear, SavePercentage};
 use either::Either;
 use entities::*;
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ pub type PixelGroupIdentifier = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PixelMatrix {
-    pub pixels: Vec<Vec<Vec<Option<Pixel>>>>,
+    pub pixels: D3Vec<Option<Pixel>>,
     pub groups: Vec<PixelGroupIdentifier>,
 }
 

@@ -1,5 +1,6 @@
-use crate::project::project_loader::Plm;
 use crate::ServiceImpl;
+use crate::misc::AdaptScopes;
+use crate::project::project_loader::Plm;
 use chrono::Local;
 use log::{error, info, warn};
 use mlc_communication::remoc::rtc;
@@ -11,11 +12,12 @@ use mlc_communication::services::project_selection::{
     ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
 };
 use mlc_data::misc::ErrIgnore;
+use mlc_data::project::universe::FixtureUniverse;
 use mlc_data::project::{ProjectSettings, ToFileName};
 use mlc_data::{
+    DynamicResult,
     fixture::blueprint::FixtureBlueprint,
     project::{ProjectMetadata, ProjectType},
-    DynamicResult,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -30,6 +32,7 @@ pub struct Project {
     pub metadata: ProjectMetadata,
     pub blueprints: Vec<FixtureBlueprint>,
     pub settings: ProjectSettings,
+    pub universes: Vec<FixtureUniverse>,
 }
 
 #[rtc::async_trait]
@@ -85,7 +88,8 @@ impl ProjectService for ServiceImpl {
         p.blueprints
             .retain(|b| !identifiers.contains(&b.meta.identifier));
         p.blueprints.append(&mut blueprints);
-        p.blueprints.sort_by(|b1, b2| b1.meta.identifier.cmp(&b2.meta.identifier));
+        p.blueprints
+            .sort_by(|b1, b2| b1.meta.identifier.cmp(&b2.meta.identifier));
 
         self.info
             .send(ProjectInfo::BlueprintsChanged.into())
@@ -269,7 +273,7 @@ impl ProjectSelectionService for ServiceImpl {
                     *self.project.write().await = p;
                     *self.valid_project.write().await = true;
                 }
-                self.adapt_notifier.notify_waiters();
+                self.adapt_notifier.notify(AdaptScopes::all());
                 return Ok(true);
             }
         }
@@ -298,6 +302,7 @@ impl Project {
                 autosave: Some(Duration::from_secs(30 * 60)),
                 save_on_quit: true,
             },
+            universes: vec![],
         }
     }
 }

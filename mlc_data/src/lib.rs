@@ -1,7 +1,7 @@
 use crate::misc::ContextError;
 use bounded::{
-    bounds::{DynamicU16, DynamicU32, DynamicU8, One, Zero},
     BoundedValue,
+    bounds::{DynamicU8, DynamicU16, DynamicU32, One, Zero},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -12,6 +12,8 @@ pub mod bounded;
 pub mod fixture;
 pub mod misc;
 pub mod project;
+
+pub type D3Vec<T> = Vec<Vec<Vec<T>>>;
 
 pub type DynamicError = Box<dyn std::error::Error>;
 pub type DynamicResult<T> = Result<T, DynamicError>;

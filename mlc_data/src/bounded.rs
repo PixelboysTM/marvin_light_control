@@ -187,6 +187,8 @@ impl<T: Display, MIN: Bounds<T>, MAX: Bounds<T>, H> Display for BoundedValue<T, 
 }
 
 pub mod bounds {
+    use std::marker::PhantomData;
+
     use super::Bounds;
 
     #[derive(Debug)]
@@ -209,9 +211,13 @@ pub mod bounds {
         };
     }
 
-    impl_bounds!(Zero, 0, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128);
-    impl_bounds!(One, 1, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128);
-    impl_bounds!(NegOne, -1, i8, i16, i32, i64, i128);
+    impl_bounds!(
+        Zero, 0, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, usize, isize
+    );
+    impl_bounds!(
+        One, 1, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, usize, isize
+    );
+    impl_bounds!(NegOne, -1, i8, i16, i32, i64, i128, isize);
     impl_bounds!(Zero, 0.0, f32, f64);
     impl_bounds!(One, 1.0, f32, f64);
     impl_bounds!(NegOne, -1.0, f32, f64);
@@ -240,4 +246,6 @@ pub mod bounds {
     impl_bounds_dynamic!(DynamicI32, i32);
     impl_bounds_dynamic!(DynamicI64, i64);
     impl_bounds_dynamic!(DynamicI128, i128);
+    impl_bounds_dynamic!(DynamicUSize, usize);
+    impl_bounds_dynamic!(DynamicISize, isize);
 }

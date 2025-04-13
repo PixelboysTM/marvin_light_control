@@ -1,18 +1,17 @@
 use crate::project::create_default_project;
-use bson::datetime;
 use log::{debug, error, info, trace, warn};
+use misc::{AdaptNotifer, AdaptScopes};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
 use mlc_communication::services::project::ProjectServiceError;
 use mlc_communication::{self as com, remoc::prelude::*};
-use mlc_data::misc::ErrIgnore;
 use mlc_data::DynamicResult;
+use mlc_data::misc::ErrIgnore;
 use mlc_ofl::OflLibrary;
-use project::{get_base_app_dir, Project};
+use project::{Project, get_base_app_dir};
 use server::setup_server;
-use std::fmt::write;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::pin::Pin;
@@ -21,18 +20,20 @@ use tokio::select;
 use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::level_filters::LevelFilter;
 use tracing::Level;
+use tracing::level_filters::LevelFilter;
 use tracing_log::LogTracer;
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
-use tracing_subscriber::fmt::{layer, time, MakeWriter};
-use tracing_subscriber::Layer;
+use tracing_subscriber::fmt::{MakeWriter, layer};
 use tui::create_tui;
+use universe::{UniverseRntimeController, UniverseRuntime};
 
+mod misc;
 mod project;
 mod server;
 mod tui;
+mod universe;
 
 const DEFAULT_SERVER_PORT: u16 = 8181;
 
@@ -41,8 +42,9 @@ pub struct ServiceImpl {
     valid_project: RwLock<bool>,
     info: Sender<Info>,
     status: Sender<String>,
-    adapt_notifier: Arc<Notify>,
+    adapt_notifier: AdaptNotifer,
     ofl_library: mlc_ofl::OflLibrary,
+    universe_runtime: UniverseRntimeController,
 }
 pub type AServiceImpl = Arc<ServiceImpl>;
 
@@ -103,10 +105,17 @@ async fn main() {
     let log_rx = setup_logging().unwrap();
 
     let project = Arc::new(RwLock::new(create_default_project()));
-    let adapt_notifier = Arc::new(Notify::new());
+    let adapt_notifier = AdaptNotifer::create();
+    let task_cancel_token = CancellationToken::new();
 
     let lib_path = get_base_app_dir().join("library");
     tokio::fs::create_dir_all(&lib_path).await.ignore();
+
+    let (universe_runtime_join, universe_runtime) = UniverseRuntime::start(
+        task_cancel_token.clone(),
+        adapt_notifier.clone(),
+        project.clone(),
+    );
 
     let service_obj = Arc::new(ServiceImpl {
         project,
@@ -115,10 +124,12 @@ async fn main() {
         status: rch::watch::channel(String::new()).0,
         adapt_notifier: adapt_notifier.clone(),
         ofl_library: OflLibrary::create(lib_path.join("ofl.json")),
+        universe_runtime,
     });
 
-    let task_cancel_token = CancellationToken::new();
     let mut task_handles = vec![];
+
+    task_handles.push(universe_runtime_join);
 
     task_handles.spawn(setup_server(
         DEFAULT_SERVER_PORT,
@@ -287,7 +298,7 @@ where
 
 async fn autosave_service(
     service_obj: AServiceImpl,
-    adapt_notifier: Arc<Notify>,
+    adapt_notifier: AdaptNotifer,
     shutdown: CancellationToken,
 ) {
     fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
@@ -309,7 +320,7 @@ async fn autosave_service(
         );
 
         select! {
-            _ = adapt_notifier.notified() => {
+            _ = adapt_notifier.wait(AdaptScopes::all()) => {
                 continue;
             }
             _ = shutdown.cancelled() => {
