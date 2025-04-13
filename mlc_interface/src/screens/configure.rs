@@ -1,16 +1,22 @@
 use crate::connect::{use_service, RtcSuspend, SClient};
 use crate::toaster::ToastInfo;
 use crate::utils::{
-    Modal, ModalResult, ModalVariant, Panel, SignalNotify, Symbol, TabController, TabItem,
-    TabOrientation, Tabs,
+    some_recv, Fader, MappedVecTabs, Modal, ModalResult, ModalVariant, Panel, SignalNotify, Symbol,
+    TabController, TabItem, TabOrientation, Tabs,
 };
 use crate::ADD_FIXTURE_MODAL;
+use dioxus::html::g::orientation;
+use dioxus::html::li::value;
 use dioxus::prelude::*;
 use dioxus::CapturedError;
 use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencilRuler};
+use futures::StreamExt;
 use itertools::Itertools;
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
 use mlc_data::fixture::blueprint::{Channel, ChannelIdentifier, FixtureBlueprint};
+use mlc_data::misc::ErrIgnore;
+use mlc_data::project::universe::{UniverseAddress, UniverseId, UNIVERSE_SIZE};
+use tokio::select;
 
 pub static BLUEPRINTS_CHANGED: SignalNotify = SignalNotify::create();
 
@@ -22,7 +28,7 @@ pub fn Configure() -> Element {
     rsx! {
         div { class: "configure",
             Panel { column: "1 / 4", row: "1 / 9", title: "Fixture Catalog", FixtureCatalog {prj_service} }
-            Panel { column: "1 / 13", row: "9 / 13", title: "Fader Panel" }
+            Panel { column: "1 / 13", row: "9 / 13", FaderPanel {prj: prj_service} }
             Panel { column: "10 / 13", row: "1 / 9", title: "Settings" }
             Panel { column: "4 / 10", row: "1 / 9", title: "Universe Patcher" }
         }
@@ -350,6 +356,88 @@ fn AddFixtureBlueprintModal(
                             class: "numChannels",
                             "NumChannels: ",
                             {p.num_channels.to_string()}
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum FCC {
+    SwitchUniverse(UniverseId),
+    SetValue { adds: UniverseAddress, value: u8 },
+}
+
+pub const UNIVERSE_LIST_CHANGED: SignalNotify = SignalNotify::create();
+
+#[component]
+fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
+    let ul = use_resource(move || async move { prj.read().universe_list().await }).rtc_suspend()?;
+
+    let tabs = use_signal(move || MappedVecTabs::new(ul, 1));
+
+    let mut data = use_signal(|| [0_u8; UNIVERSE_SIZE]);
+
+    let value_setter = use_coroutine(move |mut rx: UnboundedReceiver<FCC>| async move {
+        let mut recv = None;
+        let mut send = None;
+        loop {
+            select! {
+                Some(d) = rx.next() => {
+                    match d {
+                        FCC::SwitchUniverse(u) => {
+                            if let Ok(x) = prj.read().universe_sub(u).await {
+                                recv = Some(x.0);
+                                send = Some(x.1);
+                            }
+                        }
+                        FCC::SetValue{adds, value: v } => {
+                            if let Some(x) = &send {
+                                x.send((adds, v)).await.debug_ignore();
+                            }
+                        }
+                    }
+                }
+                Ok(r) = some_recv(recv.as_mut()) => {
+                    if let Some(u) = r {
+                        data.write()[u.0.take() - 1] = u.1;
+                    }
+                }
+            }
+        }
+    });
+
+    use_effect(move || {
+        let u = tabs.read().get();
+        value_setter.send(FCC::SwitchUniverse(u));
+    });
+
+    rsx! {
+        div { class: "faderContainer",
+            Tabs {
+                controller: tabs,
+                orientation: TabOrientation::Vertical,
+            }
+            div {
+                class: "faders",
+                for i in 0..UNIVERSE_SIZE {
+                    div {
+                        class: "fader-c",
+                        span {
+                            class: "value",
+                            {format!("{:0>3}",data.read()[i].clone())}
+                        }
+                        Fader {
+                            value: data.map(move |d| &d[i]),
+                            update: move |d| {value_setter.send(FCC::SetValue {
+                                adds: UniverseAddress::create(i + 1),
+                                value: d,
+                            })},
+                        }
+                        span {
+                            class: "adds",
+                            {(i + 1).to_string()}
                         }
                     }
                 }

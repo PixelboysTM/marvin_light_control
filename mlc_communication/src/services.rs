@@ -39,6 +39,7 @@ pub mod general {
     #[derive(Com!)]
     pub enum ProjectInfo {
         BlueprintsChanged,
+        UniverseListChanged,
     }
 
     impl From<ProjectInfo> for Info {
@@ -110,6 +111,7 @@ pub mod project_selection {
 pub mod project {
     use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use mlc_data::fixture::blueprint::{FixtureBlueprint, Metadata};
+    use mlc_data::project::universe::{UniverseAddress, UniverseId};
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
 
@@ -142,6 +144,18 @@ pub mod project {
             identifiers: Vec<String>,
         ) -> Result<(), ProjectServiceError>;
         async fn list_blueprints(&self) -> Result<Vec<FixtureBlueprint>, ProjectServiceError>;
+
+        async fn universe_list(&self) -> Result<Vec<UniverseId>, ProjectServiceError>;
+        async fn universe_sub(
+            &self,
+            universe: UniverseId,
+        ) -> Result<
+            (
+                remoc::rch::mpsc::Receiver<(UniverseAddress, u8)>,
+                remoc::rch::mpsc::Sender<(UniverseAddress, u8)>,
+            ),
+            ProjectServiceError,
+        >;
     }
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize, Clone)]

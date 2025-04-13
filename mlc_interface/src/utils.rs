@@ -1,9 +1,12 @@
+use std::future::Future;
 use std::ops::{Deref, DerefMut};
 
 use crate::toaster::ToastInfo;
 use dioxus::desktop::use_window;
 use dioxus::{document::eval, prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
+use futures::StreamExt;
+use mlc_communication::remoc::rch::mpsc::{Receiver, RecvError};
 use uuid::Uuid;
 
 #[component]
@@ -227,6 +230,43 @@ pub enum TabOrientation {
     Vertical,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MappedVecTabs<I: TabItem + 'static> {
+    options: MappedSignal<Vec<I>>,
+    current: I,
+}
+
+impl<I: TabItem + 'static> MappedVecTabs<I> {
+    pub fn new(options: MappedSignal<Vec<I>>, initial: I) -> MappedVecTabs<I> {
+        Self {
+            options,
+            current: initial,
+        }
+    }
+}
+
+impl<I: TabItem + 'static> TabController for MappedVecTabs<I> {
+    type Item = I;
+
+    fn get_options(&self) -> Vec<Self::Item> {
+        self.options.read().clone()
+    }
+
+    fn set(&mut self, option: Self::Item) {
+        self.current = option;
+    }
+
+    fn get(&self) -> Self::Item {
+        self.current.clone()
+    }
+}
+
+impl TabItem for u16 {
+    fn get_name(&self) -> String {
+        self.to_string()
+    }
+}
+
 #[component]
 pub fn Tabs<T: TabController + 'static>(
     controller: Signal<T>,
@@ -249,6 +289,24 @@ pub fn Tabs<T: TabController + 'static>(
                     {option.get_name()}
                 }
             }
+        }
+    }
+}
+
+#[component]
+pub fn Fader(value: MappedSignal<u8>, update: EventHandler<u8>) -> Element {
+    rsx! {
+        input {
+            class: "fader",
+            value: 255 - value(),
+            oninput: move |d| {
+                if let Ok(v) = d.value().parse::<u8>() {
+                    update.call(255 - v);
+                }
+            },
+            r#type: "range",
+            min: 0,
+            max: 255
         }
     }
 }
@@ -313,5 +371,13 @@ impl SignalNotify {
 
     pub fn update(&self) {
         *self.0.write() = ()
+    }
+}
+
+pub async fn some_recv<T>(recv: Option<&mut Receiver<T>>) -> Result<Option<T>, RecvError> {
+    if let Some(recv) = recv {
+        recv.recv().await
+    } else {
+        futures::future::pending().await
     }
 }

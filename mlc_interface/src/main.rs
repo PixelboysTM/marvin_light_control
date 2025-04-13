@@ -1,4 +1,4 @@
-use crate::screens::BLUEPRINTS_CHANGED;
+use crate::screens::{BLUEPRINTS_CHANGED, UNIVERSE_LIST_CHANGED};
 use crate::utils::{navigate, Branding, IconButton, ModalResult, Screen};
 use connect::{connect_url, use_service, RtcSuspend, SClient};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
@@ -228,6 +228,9 @@ fn ProjectLayout() -> Element {
                         Info::ProjectInfo{info: pi } => match pi {
                             ProjectInfo::BlueprintsChanged => {
                                 BLUEPRINTS_CHANGED.update();
+                            }
+                            ProjectInfo::UniverseListChanged => {
+                                UNIVERSE_LIST_CHANGED.update();
                             }
                         }
                     }

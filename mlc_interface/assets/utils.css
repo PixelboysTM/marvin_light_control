@@ -155,3 +155,37 @@ dialog.modalDialog {
         }
     }
 }
+
+input.fader {
+    width: 1.5em;
+    height: 100%;
+    writing-mode: tb-rl;
+    appearance: none;
+    background-color: transparent;
+    border-bottom: none;
+    margin: 0;
+
+
+    --fader-t-w: calc(1.5em / 3 - 2px);
+
+    &::-webkit-slider-runnable-track {
+        background-color: var(--c-bg);
+        width: var(--fader-t-w);
+        /*transform: translateX();*/
+        border-radius: 3px;
+    }
+
+    &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: calc(var(--fader-t-w) * 3);
+        height: calc(var(--fader-t-w) * 4);
+        background-color: var(--c-btn);
+        transform: translateX(calc(50% - var(--fader-t-w) / 2));
+        border-radius: 3px;
+        border: 1px solid var(--c-disabled);
+    }
+
+    &:hover::-webkit-slider-thumb {
+        border: 1px solid var(--c-p);
+    }
+}

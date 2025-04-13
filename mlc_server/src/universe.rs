@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use mlc_data::{
     misc::ErrIgnore,
-    project::universe::{FixtureAddress, UNIVERSE_SIZE, UniverseId},
+    project::universe::{FixtureAddress, UniverseId, UNIVERSE_SIZE},
 };
 use tokio::{
     select,
     sync::{
+        broadcast::{error::RecvError, Receiver, Sender},
         RwLock,
-        broadcast::{Receiver, Sender, error::RecvError},
     },
     task::JoinHandle,
 };
@@ -27,12 +27,12 @@ pub struct UniverseRuntime {
     project: Arc<RwLock<Project>>,
 }
 
-pub struct UniverseRntimeController {
+pub struct UniverseRuntimeController {
     update_subscriber: Sender<UniverseUpdate>,
     cmd_sender: tokio::sync::mpsc::UnboundedSender<RuntimeCommand>,
 }
 
-impl UniverseRntimeController {
+impl UniverseRuntimeController {
     pub fn subscribe(&self) -> Receiver<UniverseUpdate> {
         let rx = self.update_subscriber.subscribe();
 
@@ -91,6 +91,7 @@ impl UniverseUpdateSubscriber {
 pub enum RuntimeCommand {
     ResendUniverses,
     ResendUniverse(UniverseId),
+    UpdateData(UniverseUpdate),
 }
 
 pub type UpdateChunk = (FixtureAddress, u8);
@@ -114,7 +115,7 @@ impl UniverseRuntime {
         shutdown: CancellationToken,
         adapt_notifier: AdaptNotifer,
         project: Arc<RwLock<Project>>,
-    ) -> (JoinHandle<()>, UniverseRntimeController) {
+    ) -> (JoinHandle<()>, UniverseRuntimeController) {
         let (update_tx, _update_rx) = tokio::sync::broadcast::channel(32);
         let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -129,7 +130,7 @@ impl UniverseRuntime {
 
         (
             j,
-            UniverseRntimeController {
+            UniverseRuntimeController {
                 update_subscriber: update_tx,
                 cmd_sender: cmd_tx,
             },
@@ -171,6 +172,35 @@ impl UniverseRuntime {
                 }
             }
             RuntimeCommand::ResendUniverse(i) => self.send_universe(i).await,
+            RuntimeCommand::UpdateData(update) => {
+                match &update {
+                    UniverseUpdate::Single { update } => {
+                        if let Some(data) = self
+                            .runtime_universes
+                            .get_mut(update.0.universe() as usize - 1)
+                        {
+                            data[update.0.address().take()] = update.1;
+                        }
+                    }
+                    UniverseUpdate::Many { updates } => {
+                        for update in updates {
+                            if let Some(data) = self
+                                .runtime_universes
+                                .get_mut(update.0.universe() as usize - 1)
+                            {
+                                data[update.0.address().take()] = update.1;
+                            }
+                        }
+                    }
+                    UniverseUpdate::Entire { universe, values } => {
+                        if let Some(data) = self.runtime_universes.get_mut(*universe as usize - 1) {
+                            *data = *values;
+                        }
+                    }
+                }
+
+                self.update_notifier.send(update).debug_ignore();
+            }
         }
         log::trace!("Finished RuntimeCommand Handling");
     }

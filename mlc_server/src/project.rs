@@ -1,8 +1,10 @@
-use crate::ServiceImpl;
 use crate::misc::AdaptScopes;
 use crate::project::project_loader::Plm;
+use crate::universe::{RuntimeCommand, UniverseUpdate};
+use crate::ServiceImpl;
 use chrono::Local;
 use log::{error, info, warn};
+use mlc_communication::remoc::rch::mpsc::{Receiver, Sender};
 use mlc_communication::remoc::rtc;
 use mlc_communication::services::general::{Info, ProjectInfo};
 use mlc_communication::services::project::{
@@ -12,16 +14,17 @@ use mlc_communication::services::project_selection::{
     ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
 };
 use mlc_data::misc::ErrIgnore;
-use mlc_data::project::universe::FixtureUniverse;
+use mlc_data::project::universe::{FixtureAddress, FixtureUniverse, UniverseAddress, UniverseId};
 use mlc_data::project::{ProjectSettings, ToFileName};
 use mlc_data::{
-    DynamicResult,
     fixture::blueprint::FixtureBlueprint,
     project::{ProjectMetadata, ProjectType},
+    DynamicResult,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio::select;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 mod project_loader;
@@ -100,6 +103,72 @@ impl ProjectService for ServiceImpl {
 
     async fn list_blueprints(&self) -> Result<Vec<FixtureBlueprint>, ProjectServiceError> {
         Ok(self.project.read().await.blueprints.clone())
+    }
+
+    async fn universe_list(&self) -> Result<Vec<UniverseId>, ProjectServiceError> {
+        Ok(self
+            .project
+            .read()
+            .await
+            .universes
+            .iter()
+            .enumerate()
+            .map(|(i, _)| i as u16 + 1)
+            .collect::<Vec<_>>())
+    }
+
+    async fn universe_sub(
+        &self,
+        universe: UniverseId,
+    ) -> Result<
+        (
+            Receiver<(UniverseAddress, u8)>,
+            Sender<(UniverseAddress, u8)>,
+        ),
+        ProjectServiceError,
+    > {
+        let (tx_1, rx_1) =
+            mlc_communication::remoc::rch::mpsc::channel::<(UniverseAddress, u8), _>(100);
+        let (tx_2, mut rx_2) =
+            mlc_communication::remoc::rch::mpsc::channel::<(UniverseAddress, u8), _>(100);
+
+        let controller = self.universe_runtime.clone();
+
+        let shutdown = self.shutdown.clone();
+        tokio::task::spawn(async move {
+            let mut sub = controller.subscribe_universe(universe);
+            loop {
+                select! {
+                    _ = shutdown.cancelled() => break,
+                    Ok(update) = sub.recv() => {
+                        match update {
+                            UniverseUpdate::Single{ update } => {
+                                tx_1.send((update.0.address(), update.1)).await.debug_ignore();
+                            }
+                            UniverseUpdate::Many{ updates } => {
+                                for update in updates {
+                                    tx_1.send((update.0.address(), update.1)).await.debug_ignore();
+                                }
+                            }
+                            UniverseUpdate::Entire{ values, .. } => {
+                                for (i, update) in values.into_iter().enumerate() {
+                                    tx_1.send((UniverseAddress::create(i + 1), update)).await.debug_ignore();
+                                }
+                            }
+                        }
+                    }
+                    Ok(ch) = rx_2.recv() => {
+                        if let Some(update) = ch {
+                            controller.cmd(RuntimeCommand::UpdateData(UniverseUpdate::Single {
+                                update: (FixtureAddress::new(universe, update.0), update.1),
+                            }))
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok((rx_1, tx_2))
     }
 }
 

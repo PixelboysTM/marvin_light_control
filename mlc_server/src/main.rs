@@ -7,10 +7,10 @@ use mlc_communication::services::general::Info;
 use mlc_communication::services::general::{Alive, View};
 use mlc_communication::services::project::ProjectServiceError;
 use mlc_communication::{self as com, remoc::prelude::*};
-use mlc_data::DynamicResult;
 use mlc_data::misc::ErrIgnore;
+use mlc_data::DynamicResult;
 use mlc_ofl::OflLibrary;
-use project::{Project, get_base_app_dir};
+use project::{get_base_app_dir, Project};
 use server::setup_server;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -20,14 +20,14 @@ use tokio::select;
 use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::Level;
 use tracing::level_filters::LevelFilter;
+use tracing::Level;
 use tracing_log::LogTracer;
 use tracing_subscriber::fmt::format::{FmtSpan, Writer};
 use tracing_subscriber::fmt::time::FormatTime;
-use tracing_subscriber::fmt::{MakeWriter, layer};
+use tracing_subscriber::fmt::{layer, MakeWriter};
 use tui::create_tui;
-use universe::{UniverseRntimeController, UniverseRuntime};
+use universe::{UniverseRuntime, UniverseRuntimeController};
 
 mod misc;
 mod project;
@@ -44,7 +44,8 @@ pub struct ServiceImpl {
     status: Sender<String>,
     adapt_notifier: AdaptNotifer,
     ofl_library: mlc_ofl::OflLibrary,
-    universe_runtime: UniverseRntimeController,
+    universe_runtime: Arc<UniverseRuntimeController>,
+    shutdown: CancellationToken,
 }
 pub type AServiceImpl = Arc<ServiceImpl>;
 
@@ -124,7 +125,8 @@ async fn main() {
         status: rch::watch::channel(String::new()).0,
         adapt_notifier: adapt_notifier.clone(),
         ofl_library: OflLibrary::create(lib_path.join("ofl.json")),
-        universe_runtime,
+        universe_runtime: Arc::new(universe_runtime),
+        shutdown: task_cancel_token.clone(),
     });
 
     let mut task_handles = vec![];
