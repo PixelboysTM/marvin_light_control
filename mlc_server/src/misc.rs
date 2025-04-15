@@ -2,21 +2,21 @@ use std::sync::Arc;
 
 use bitflags::bitflags;
 use mlc_data::misc::ErrIgnore;
-use tokio::sync::watch::{self, Sender};
+use tokio::sync::watch::{self};
 
 #[derive(Debug, Clone)]
-pub struct AdaptNotifer {
-    notifier: Arc<tokio::sync::watch::Sender<AdaptScopes>>,
-    waiter: Arc<tokio::sync::watch::Receiver<AdaptScopes>>,
+pub struct AdaptNotifier {
+    notifier: Arc<watch::Sender<AdaptScopes>>,
+    _waiter: Arc<watch::Receiver<AdaptScopes>>,
 }
 
-impl AdaptNotifer {
+impl AdaptNotifier {
     pub fn create() -> Self {
         let (tx, rx) = watch::channel(AdaptScopes::NONE);
 
         Self {
             notifier: Arc::new(tx),
-            waiter: Arc::new(rx),
+            _waiter: Arc::new(rx),
         }
     }
 
@@ -52,5 +52,7 @@ bitflags! {
     pub struct AdaptScopes: u16 {
         const NONE =      0b00000000;
         const UNIVERSES = 0b00000001;
+        const ENDPOINTS = 0b00000010;
+        const SETTINGS =  0b00000100;
     }
 }

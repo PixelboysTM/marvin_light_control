@@ -15,7 +15,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    misc::{AdaptNotifer, AdaptScopes},
+    misc::{AdaptNotifier, AdaptScopes},
     project::Project,
 };
 
@@ -113,7 +113,7 @@ pub enum UniverseUpdate {
 impl UniverseRuntime {
     pub fn start(
         shutdown: CancellationToken,
-        adapt_notifier: AdaptNotifer,
+        adapt_notifier: AdaptNotifier,
         project: Arc<RwLock<Project>>,
     ) -> (JoinHandle<()>, UniverseRuntimeController) {
         let (update_tx, _update_rx) = tokio::sync::broadcast::channel(32);
@@ -140,7 +140,7 @@ impl UniverseRuntime {
     fn spawn(
         mut self,
         shutdown: CancellationToken,
-        adapt_notifier: AdaptNotifer,
+        adapt_notifier: AdaptNotifier,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             log::info!("Starting Universe Runtime");

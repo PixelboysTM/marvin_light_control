@@ -1,6 +1,6 @@
 use crate::project::create_default_project;
 use log::{debug, error, info, trace, warn};
-use misc::{AdaptNotifer, AdaptScopes};
+use misc::{AdaptNotifier, AdaptScopes};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
@@ -42,7 +42,7 @@ pub struct ServiceImpl {
     valid_project: RwLock<bool>,
     info: Sender<Info>,
     status: Sender<String>,
-    adapt_notifier: AdaptNotifer,
+    adapt_notifier: AdaptNotifier,
     ofl_library: mlc_ofl::OflLibrary,
     universe_runtime: Arc<UniverseRuntimeController>,
     shutdown: CancellationToken,
@@ -106,7 +106,7 @@ async fn main() {
     let log_rx = setup_logging().unwrap();
 
     let project = Arc::new(RwLock::new(create_default_project()));
-    let adapt_notifier = AdaptNotifer::create();
+    let adapt_notifier = AdaptNotifier::create();
     let task_cancel_token = CancellationToken::new();
 
     let lib_path = get_base_app_dir().join("library");
@@ -300,7 +300,7 @@ where
 
 async fn autosave_service(
     service_obj: AServiceImpl,
-    adapt_notifier: AdaptNotifer,
+    adapt_notifier: AdaptNotifier,
     shutdown: CancellationToken,
 ) {
     fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
@@ -322,7 +322,7 @@ async fn autosave_service(
         );
 
         select! {
-            _ = adapt_notifier.wait(AdaptScopes::all()) => {
+            _ = adapt_notifier.wait(AdaptScopes::SETTINGS) => {
                 continue;
             }
             _ = shutdown.cancelled() => {
