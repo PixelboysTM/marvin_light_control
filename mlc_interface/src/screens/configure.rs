@@ -6,7 +6,7 @@ use crate::utils::{
 };
 use crate::ADD_FIXTURE_MODAL;
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencilRuler, LdRoute};
+use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencil, LdPencilRuler, LdRoute, LdSearch};
 use futures::StreamExt;
 use itertools::Itertools;
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
@@ -103,11 +103,11 @@ fn FixtureCatalog(prj_service: SClient<ProjectServiceIdent>) -> Element {
     rsx! {
         div {
             class: "fixtureCatalog",
-            for (i, b) in blueprints().iter().map(|b| (b.meta.identifier.clone(), b)) {
+            for (i1, i2, b) in blueprints().iter().map(|b| (b.meta.identifier.clone(), b.meta.identifier.clone(), b)) {
                 div {
                     class: "blueprint",
                     ondoubleclick: move |_| {
-                        let i = i.clone();
+                        let i = i1.clone();
                         async move {
                         *detailed_blueprint_indent.write() = i;
                         BLUEPRINT_DETAILS.open().await;
@@ -122,6 +122,18 @@ fn FixtureCatalog(prj_service: SClient<ProjectServiceIdent>) -> Element {
                         for m in b.modes.iter() {
                             li {
                                 {m.name.clone()}
+                            }
+                        }
+                    }
+
+                    IconButton {
+                        icon: LdPencil,
+                        class: "inspect",
+                        onclick: move |_| {
+                            let i = i2.clone();
+                            async move {
+                                *detailed_blueprint_indent.write() = i;
+                                BLUEPRINT_DETAILS.open().await;
                             }
                         }
                     }

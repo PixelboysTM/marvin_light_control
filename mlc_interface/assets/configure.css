@@ -20,6 +20,7 @@
             margin-bottom: var(--space);
             border-radius: var(--br);
             border: 1px solid var(--c-p);
+            position: relative;
 
             h1 {
                 font-size: 1.25em;
@@ -39,7 +40,24 @@
                 padding: 0 0 var(--space) 1.75rem;
                 margin: 0;
             }
+
+            .inspect {
+                position: absolute;
+                width: 1.75rem;
+                height: 1.75rem;
+                top: 0;
+                right: 0;
+                padding: var(--space);
+
+                visibility: hidden;
+            }
+
+            &:hover .inspect {
+                visibility: visible;
+            }
         }
+
+
     }
 
     .faderContainer {
