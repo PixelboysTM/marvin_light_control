@@ -2,3 +2,5 @@
 target/
 /lib_test.json
 tree.txt
+server-verbose.log
+server.log
