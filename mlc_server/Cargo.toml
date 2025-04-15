@@ -12,7 +12,6 @@ mlc_communication = { path = "../mlc_communication" }
 mlc_ofl = { path = "../mlc_ofl" }
 mlc_data = { path = "../mlc_data" }
 log.workspace = true
-fern = { version = "0.7", features = ["colored"] }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["json", "time"] }
 tracing-log = "0.2.0"
@@ -27,5 +26,5 @@ directories.workspace = true
 futures = "0.3.31"
 lazy_static = "1.5.0"
 textwrap = "0.16.2"
-unicode-width = "0.2.0"
 bitflags = "2.9.0"
+circular-buffer = "1.1.0"

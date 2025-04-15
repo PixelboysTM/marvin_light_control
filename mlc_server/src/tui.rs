@@ -1,4 +1,5 @@
 use ansi_to_tui::IntoText;
+use circular_buffer::CircularBuffer;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Alignment;
 use ratatui::prelude::Margin;
@@ -18,7 +19,6 @@ use std::{io, sync::Arc, time::Duration};
 use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use tui_logger::{ExtLogRecord, LogFormatter};
 
 use crate::AServiceImpl;
 
@@ -39,7 +39,7 @@ pub async fn create_tui(
             meta_information: None,
             log_state: LogWidgetState {
                 rx: log_rx,
-                paragraphs: Text::default(),
+                paragraphs: CircularBuffer::new(),
                 scroll: 0,
                 scroll_state: ScrollbarState::default(),
                 last_total_height: 0,
@@ -65,9 +65,11 @@ pub struct TuiAppState {
     log_state: LogWidgetState,
 }
 
+pub const TUI_BACKLOG_LENGTH: usize = 128;
+
 pub struct LogWidgetState {
     rx: std::sync::mpsc::Receiver<Vec<u8>>,
-    paragraphs: Text<'static>,
+    paragraphs: CircularBuffer<TUI_BACKLOG_LENGTH, Line<'static>>,
     scroll: usize,
     scroll_state: ScrollbarState,
     last_total_height: usize,
@@ -85,17 +87,21 @@ impl StatefulWidget for LogWidget {
         let remaining_height = block.inner(area).height as usize;
         let total_height =
             calculate_wrapped_paragraph_height(&state.paragraphs, block.inner(area).width) as usize;
-        
+
         let to_scroll = total_height.saturating_sub(state.last_total_height);
 
         state.scroll_state = state
             .scroll_state
             .content_length(total_height.saturating_sub(remaining_height));
 
-        state.scroll = state.scroll.saturating_add(to_scroll).min(total_height).max(0);
+        state.scroll = state
+            .scroll
+            .saturating_add(to_scroll)
+            .min(total_height)
+            .max(0);
         state.scroll_state = state.scroll_state.position(state.scroll);
 
-        Paragraph::new(state.paragraphs.clone())
+        Paragraph::new(state.paragraphs.to_vec())
             .block(block)
             .wrap(Wrap { trim: true })
             .scroll((state.scroll.saturating_sub(remaining_height) as u16, 0))
@@ -112,17 +118,20 @@ impl StatefulWidget for LogWidget {
                 buf,
                 &mut state.scroll_state,
             );
-        
+
         state.last_total_height = total_height;
     }
 }
 
-pub fn calculate_wrapped_paragraph_height(text: &Text, max_width: u16) -> u16 {
+pub fn calculate_wrapped_paragraph_height(
+    text: &CircularBuffer<TUI_BACKLOG_LENGTH, Line<'static>>,
+    max_width: u16,
+) -> u16 {
     let wrap_width = max_width as usize;
 
     let mut total_lines = 0;
 
-    for line in &text.lines {
+    for line in text {
         // Combine spans into a single string with appropriate spacing
         let mut line_content = String::new();
         for span in &line.spans {
@@ -175,22 +184,11 @@ impl TuiApp {
 
     fn handle_events(&mut self) -> io::Result<()> {
         while let Ok(event) = self.tui_state.log_state.rx.try_recv() {
-            let mut s = event.into_text().unwrap();
-            let len = s.iter().len();
+            let s = event.into_text().unwrap();
             self.tui_state
                 .log_state
                 .paragraphs
-                .lines
-                .append(&mut s.lines);
-            // for (i, line) in s.lines.into_iter().enumerate() {
-            //     self.tui_state.log_state.paragraphs.lines.insert(i, line);
-            // }
-            // self.tui_state.log_state.scroll = self.tui_state.log_state.scroll.saturating_add(len);
-            // self.tui_state.log_state.scroll_state = self
-            //     .tui_state
-            //     .log_state
-            //     .scroll_state
-            //     .position(self.tui_state.log_state.scroll);
+                .extend(s.lines.into_iter());
         }
 
         if !event::poll(Duration::from_millis(250))? {

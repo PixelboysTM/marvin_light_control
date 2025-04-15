@@ -219,6 +219,7 @@ fn setup_logging() -> DynamicResult<std::sync::mpsc::Receiver<Vec<u8>>> {
                         .truncate(true)
                         .open("server-verbose.log")?,
                 )
+                .with_span_events(FmtSpan::FULL)
                 .with_filter(LevelFilter::TRACE),
         )
         .with(
@@ -230,7 +231,6 @@ fn setup_logging() -> DynamicResult<std::sync::mpsc::Receiver<Vec<u8>>> {
                 // .with_target(true)
                 .with_file(debug)
                 .with_line_number(debug)
-                .with_span_events(FmtSpan::FULL)
                 .with_target(false)
                 .with_filter(LevelFilter::INFO),
         );
