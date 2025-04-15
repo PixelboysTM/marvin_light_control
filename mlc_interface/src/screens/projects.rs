@@ -97,8 +97,9 @@ pub fn Projects() -> Element {
     let mut projects = use_resource::<Vec<ProjectMetadata>, _>(move || {
         let s2 = s2.clone();
         async move {
-            let ps = s2.read().list().await.expect("Couldn't get projects");
-            println!("{:#?}", ps.iter().map(|p| &p.file_name).collect::<Vec<_>>());
+            let mut ps = s2.read().list().await.expect("Couldn't get projects");
+            // println!("{:#?}", ps.iter().map(|p| &p.file_name).collect::<Vec<_>>());
+            ps.sort_by(|p1, p2| p1.last_saved.cmp(&p2.last_saved).reverse());
             ps
         }
     });

@@ -179,7 +179,7 @@ impl UniverseRuntime {
                             .runtime_universes
                             .get_mut(update.0.universe() as usize - 1)
                         {
-                            data[update.0.address().take()] = update.1;
+                            data[update.0.address().take() - 1] = update.1;
                         }
                     }
                     UniverseUpdate::Many { updates } => {
@@ -188,7 +188,7 @@ impl UniverseRuntime {
                                 .runtime_universes
                                 .get_mut(update.0.universe() as usize - 1)
                             {
-                                data[update.0.address().take()] = update.1;
+                                data[update.0.address().take() - 1] = update.1;
                             }
                         }
                     }

@@ -52,8 +52,10 @@
         width: 100%;
         height: 100%;
 
-        display: grid;
-        grid-template-rows: auto 1fr;
+        .withTitle {
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
 
         h1.title {
             margin: 0;

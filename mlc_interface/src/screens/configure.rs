@@ -1,8 +1,8 @@
 use crate::connect::{use_service, RtcSuspend, SClient};
 use crate::toaster::ToastInfo;
 use crate::utils::{
-    some_recv, Fader, MappedVecTabs, Modal, ModalResult, ModalVariant, Panel, SignalNotify, Symbol,
-    TabController, TabItem, TabOrientation, Tabs,
+    some_recv, Fader, MappedVecTabs, Modal, ModalResult, ModalVariant, Orientation, Panel,
+    SignalNotify, Symbol, TabController, TabItem, Tabs,
 };
 use crate::ADD_FIXTURE_MODAL;
 use dioxus::html::g::orientation;
@@ -184,7 +184,7 @@ fn BlueprintDetailsModal(
     rsx! {
         Tabs {
             controller: mode,
-            orientation: TabOrientation::Horizontal
+            orientation: Orientation::Horizontal
         },
 
         match *mode.read() {
@@ -417,7 +417,7 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
         div { class: "faderContainer",
             Tabs {
                 controller: tabs,
-                orientation: TabOrientation::Vertical,
+                orientation: Orientation::Vertical,
             }
             div {
                 class: "faders",

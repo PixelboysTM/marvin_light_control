@@ -194,9 +194,12 @@ pub fn Panel(
     row: String,
     title: Option<String>,
 ) -> Element {
+    let has_title = title.is_some();
+
     rsx! {
         div {
             class: "panel",
+            class: if has_title {"withTitle"} else {""},
             style: format!("grid-column: {column}; grid-row: {row}"),
             if let Some(title) = title {
                 h1 { class: "title", {title} }
@@ -225,7 +228,7 @@ pub trait TabController: PartialEq {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum TabOrientation {
+pub enum Orientation {
     Horizontal,
     Vertical,
 }
@@ -270,14 +273,14 @@ impl TabItem for u16 {
 #[component]
 pub fn Tabs<T: TabController + 'static>(
     controller: Signal<T>,
-    orientation: TabOrientation,
+    orientation: Orientation,
     class: Option<String>,
 ) -> Element {
     rsx! {
         div {
             class: format!("tabBar {} {}", match orientation {
-                TabOrientation::Horizontal => " tab-orientation-horizontal",
-                TabOrientation::Vertical => "tab-orientation-vertical",
+                Orientation::Horizontal => " tab-orientation-horizontal",
+                Orientation::Vertical => "tab-orientation-vertical",
             }, class.unwrap_or_default()),
             for option in controller.read().get_options() {
                 button {
@@ -294,12 +297,31 @@ pub fn Tabs<T: TabController + 'static>(
 }
 
 #[component]
-pub fn Fader(value: MappedSignal<u8>, update: EventHandler<u8>) -> Element {
+pub fn Fader(
+    value: MappedSignal<u8>,
+    update: EventHandler<u8>,
+    orientation: Option<Orientation>,
+    class: Option<String>,
+) -> Element {
     rsx! {
+        // div {
+        //     class: format!("widgetFader {} {}", match orientation.unwrap_or(Orientation::Vertical) {
+        //         Orientation::Horizontal => " fader-orientation-horizontal",
+        //         Orientation::Vertical => "fader-orientation-vertical",
+        //     }, class.unwrap_or_default()),
+        //     style: format!("--dw-fv: {};", *value.read() as f32 / 255.0 * 100.0),
+        //     div {
+        //         class: "track"
+        //     }
+        //     div {
+        //         class: "knob"
+        //     }
+        // }
+
         input {
-            class: "fader",
+            class: format!("fader {}", class.unwrap_or_default()),
             value: 255 - value(),
-            oninput: move |d| {
+            onchange: move |d| {
                 if let Ok(v) = d.value().parse::<u8>() {
                     update.call(255 - v);
                 }

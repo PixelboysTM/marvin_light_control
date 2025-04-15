@@ -14,7 +14,9 @@ use mlc_communication::services::project_selection::{
     ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
 };
 use mlc_data::misc::ErrIgnore;
-use mlc_data::project::universe::{FixtureAddress, FixtureUniverse, UniverseAddress, UniverseId};
+use mlc_data::project::universe::{
+    FixtureAddress, FixtureUniverse, UniverseAddress, UniverseId, UniverseSlot, UNIVERSE_SIZE,
+};
 use mlc_data::project::{ProjectSettings, ToFileName};
 use mlc_data::{
     fixture::blueprint::FixtureBlueprint,
@@ -22,6 +24,7 @@ use mlc_data::{
     DynamicResult,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::select;
@@ -371,7 +374,16 @@ impl Project {
                 autosave: Some(Duration::from_secs(30 * 60)),
                 save_on_quit: true,
             },
-            universes: vec![],
+            universes: vec![
+                FixtureUniverse {
+                    addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
+                    fixtures: HashMap::new(),
+                },
+                FixtureUniverse {
+                    addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
+                    fixtures: HashMap::new(),
+                },
+            ],
         }
     }
 }

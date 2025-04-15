@@ -5,8 +5,8 @@ use serde_with::serde_as;
 
 use crate::{
     bounded::{
-        BoundedValue,
         bounds::{DynamicUSize, One},
+        BoundedValue,
     },
     fixture::patched::{PatchedFixture, PatchedFixtureId},
 };
@@ -21,7 +21,7 @@ pub struct FixtureUniverse {
     pub fixtures: HashMap<PatchedFixtureId, PatchedFixture>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum UniverseSlot {
     Unused,
     Consecutive,
