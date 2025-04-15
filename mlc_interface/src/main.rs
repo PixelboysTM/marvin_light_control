@@ -327,7 +327,14 @@ fn ProjectLayout() -> Element {
                     }
                 }
             }
-            Outlet::<Route> {}
+            SuspenseBoundary {
+                fallback: move |_| {
+                    rsx!{
+                        Loader{}
+                    }
+                },
+                Outlet::<Route> {}
+            }
             footer { {format!("Ping: {}ms, Status: {}", delay.read(), status_msg.read())} }
 
 
