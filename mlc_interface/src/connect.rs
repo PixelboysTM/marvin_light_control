@@ -1,7 +1,7 @@
 use dioxus::hooks::use_signal;
-use dioxus::logger::tracing::error;
 use dioxus::prelude::*;
 use dioxus::signals::{Readable, Signal};
+use dioxus::CapturedError;
 use mlc_communication::remoc::ConnectExt;
 use mlc_communication::{remoc, ServiceIdentifiable};
 use std::net::Ipv4Addr;
@@ -56,7 +56,11 @@ pub fn use_service_url<I: ServiceIdentifiable>(
         UseServiceState::Pending => {
             return Err(RenderError::Suspended(SuspendedFuture::new(fut.task())));
         }
-        UseServiceState::Errored(_error) => return Err(RenderError::default()), // TODO: Pack da halt den error rein
+        UseServiceState::Errored(error) => {
+            return Err(RenderError::Aborted(CapturedError::from_display(
+                error.to_string(),
+            )))
+        }
     }
 
     Ok(use_memo(move || {
@@ -83,10 +87,9 @@ impl<T: Clone, E: std::fmt::Debug + Clone> RtcSuspend<T> for Resource<Result<T, 
         match self.suspend() {
             Ok(v) => match &*v.read() {
                 Ok(_) => Ok(v.clone().map(|r| r.as_ref().expect("Must be"))),
-                Err(e) => {
-                    error!("Making fake msg: {e:?}");
-                    Err(RenderError::default())
-                } // TODO: Make real error msg
+                Err(e) => Err(RenderError::Aborted(CapturedError::from_display(
+                    format!("{e:?}"),
+                ))),
             },
             Err(s) => Err(s),
         }

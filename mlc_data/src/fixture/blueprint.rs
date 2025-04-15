@@ -48,12 +48,16 @@ impl PixelMatrix {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pixel {
     pub key: String,
+    pub location: PixelLocation,
     pub groups: Vec<PixelGroupIdentifier>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PixelLocation(pub u16, pub u16, pub u16);
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum PixelIdentifier {
-    Pixel(usize, usize, usize),
+    Pixel(PixelLocation),
     Group(PixelGroupIdentifier),
     #[default]
     Master,

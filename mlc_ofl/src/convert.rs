@@ -3,7 +3,7 @@ use mlc_data::fixture::blueprint::entities::{Brightness, FogKind};
 use mlc_data::fixture::blueprint::units::Percentage;
 use mlc_data::fixture::blueprint::{
     Capability, CapabilityKind, Channel, ChannelIdentifier, CommonChannel, FixtureBlueprint,
-    Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelMatrix,
+    Metadata, Mode, Physical, Pixel, PixelIdentifier, PixelLocation, PixelMatrix,
 };
 use mlc_data::misc::ContextError;
 use mlc_data::project::ToFileName;
@@ -22,7 +22,7 @@ mod units;
 
 pub fn convert(ofl_source: &Value, manufacturer: String) -> ContextResult<FixtureBlueprint> {
     // TODO: Implement switch channels
-    
+
     let meta = parse_metadata(ofl_source, manufacturer)?;
 
     let matrix = parse_matrix(&ofl_source["matrix"])?;
@@ -65,29 +65,42 @@ fn parse_channels(
         channels.insert(k.clone(), channel);
     }
 
+    fn set_pixel(channel: &mut CommonChannel, ident: &PixelIdentifier) {
+        for cap in &mut channel.capabilities {
+            cap.pixel = ident.clone();
+        }
+    }
+
     if let Some(obj) = templ_src.as_object() {
         let keys =
             collect_pixel_keys(matrix.ok_or(err!("templateChannels implies a matrix is present"))?)
                 .collect::<Vec<_>>();
         for (k, v) in obj {
             let channel = parse_channel(v)?;
-            for key in &keys {
+            for (key, ident) in &keys {
                 let mut c = channel.clone();
                 match &mut c {
-                    Channel::Single { .. } => {}
+                    Channel::Single { channel } => {
+                        set_pixel(channel, ident);
+                    }
                     Channel::Double {
                         second_channel_name,
-                        ..
-                    } => *second_channel_name = second_channel_name.replace("$pixelKey", key),
+                        channel,
+                    } => {
+                        *second_channel_name = second_channel_name.replace("$pixelKey", key);
+                        set_pixel(channel, ident);
+                    }
                     Channel::Tripple {
                         second_channel_name,
                         third_channel_name,
-                        ..
+                        channel,
                     } => {
                         *second_channel_name = second_channel_name.replace("$pixelKey", key);
                         *third_channel_name = third_channel_name.replace("$pixelKey", key);
+                        set_pixel(channel, ident);
                     }
                 }
+
                 channels.insert(k.replace("$pixelKey", key), c);
             }
         }
@@ -96,14 +109,18 @@ fn parse_channels(
     Ok(channels)
 }
 
-fn collect_pixel_keys(m: &PixelMatrix) -> impl Iterator<Item = &str> {
+fn collect_pixel_keys(m: &PixelMatrix) -> impl Iterator<Item = (&str, PixelIdentifier)> {
     m.pixels
         .iter()
         .flatten()
         .flatten()
         .flatten()
-        .map(|p| p.key.as_str())
-        .chain(m.groups.iter().map(|g| g.as_str()))
+        .map(|p| (p.key.as_str(), PixelIdentifier::Pixel(p.location.clone())))
+        .chain(
+            m.groups
+                .iter()
+                .map(|g| (g.as_str(), PixelIdentifier::Group(g.clone()))),
+        )
 }
 
 fn parse_channel(src: &Value) -> ContextResult<Channel> {
@@ -262,7 +279,7 @@ fn parse_capability(
         range,
         comment,
         kind,
-        pixel: PixelIdentifier::Master, //TODO: Change later for template channels
+        pixel: PixelIdentifier::Master,
     })
 }
 
@@ -707,6 +724,7 @@ fn parse_matrix(src: &Value) -> ContextResult<Option<PixelMatrix>> {
             array[2],
             Some(Pixel {
                 key: String::new(),
+                location: PixelLocation(0, 0, 0),
                 groups: vec![],
             }),
         );
@@ -727,6 +745,7 @@ fn parse_matrix(src: &Value) -> ContextResult<Option<PixelMatrix>> {
                         (false, true) => zs.key = format!("({}, {})", xi + 1, yi + 1),
                         _ => zs.key = format!("({}, {}, {})", xi + 1, yi + 1, zi + 1),
                     }
+                    zs.location = PixelLocation(xi as u16 + 1, yi as u16 + 1, zi as u16 + 1);
                     i += 1;
                 }
             }
@@ -743,19 +762,27 @@ fn parse_matrix(src: &Value) -> ContextResult<Option<PixelMatrix>> {
             .as_array()
             .ok_or(err!("Matrix pixelKeys not an array"))?
             .iter()
-            .map(|v| {
+            .enumerate()
+            .map(|(z, v)| {
                 v.as_array()
                     .ok_or(err!("Matrix pixelKeys not an 3d array"))
-                    .map(|a| {
-                        a.iter()
-                            .map(|v| {
+                    .map(|ys| {
+                        ys.iter()
+                            .enumerate()
+                            .map(|(y, v)| {
                                 v.as_array()
                                     .ok_or(err!("Matrix pixelKeys not an 3d array"))
-                                    .map(|a| {
-                                        a.iter()
-                                            .map(|v| {
+                                    .map(|zs| {
+                                        zs.iter()
+                                            .enumerate()
+                                            .map(|(x, v)| {
                                                 v.as_str().map(|s| Pixel {
                                                     key: s.to_string(),
+                                                    location: PixelLocation(
+                                                        x as u16 + 1,
+                                                        y as u16 + 1,
+                                                        z as u16 + 1,
+                                                    ),
                                                     groups: vec![],
                                                 })
                                             })
