@@ -1,12 +1,12 @@
 use crate::connect::{use_service, RtcSuspend, SClient};
 use crate::toaster::ToastInfo;
 use crate::utils::{
-    some_recv, Fader, MappedVecTabs, Modal, ModalResult, ModalVariant, Orientation, Panel,
-    SignalNotify, Symbol, TabController, TabItem, Tabs,
+    some_recv, Fader, IconButton, MappedVecTabs, Modal, ModalResult, ModalVariant, Orientation,
+    Panel, SignalNotify, Symbol, TabController, TabItem, Tabs,
 };
 use crate::ADD_FIXTURE_MODAL;
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencilRuler};
+use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencilRuler, LdRoute};
 use futures::StreamExt;
 use itertools::Itertools;
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
@@ -26,7 +26,7 @@ pub fn Configure() -> Element {
         div { class: "configure",
             Panel { column: "1 / 4", row: "1 / 9", title: "Fixture Catalog", FixtureCatalog {prj_service} }
             Panel { column: "1 / 13", row: "9 / 13", FaderPanel {prj: prj_service} }
-            Panel { column: "10 / 13", row: "1 / 9", title: "Settings" }
+            Panel { column: "10 / 13", row: "1 / 9", title: "Settings", Settings {prj: prj_service} }
             Panel { column: "4 / 10", row: "1 / 9", title: "Universe Patcher" }
         }
 
@@ -437,6 +437,70 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
                             {(i + 1).to_string()}
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
+    rsx! {
+        div {
+            class: "settingsContainer",
+            h3 {
+                "Title:"
+            }
+            p {
+                "Test Project"
+            }
+
+            h3 {
+                "Filename:"
+            }
+
+            code {
+                "test_project.mlc"
+            }
+
+            h3 {
+                "Format"
+            }
+
+            p {
+                "Binary"
+            }
+
+            h3 {
+                "Save on quit"
+            }
+
+            input {
+                r#type: "checkbox",
+            }
+
+            h3 {
+                "Autosave"
+            }
+
+            input {
+                r#type: "checkbox",
+            }
+
+            h3 {
+                "Interval"
+            }
+
+            p {
+                "00:30"
+            }
+
+            div {
+                class: "buttons",
+
+                IconButton {
+                    icon: LdRoute,
+                    text: "Endpoint Mappings"
                 }
             }
         }

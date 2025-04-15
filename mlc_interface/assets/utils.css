@@ -114,15 +114,15 @@ dialog.modalDialog {
 }
 
 .iconBtn {
-    display: grid;
+    display: flex;
     align-items: center;
     padding: 0.4rem;
     width: 100%;
     height: 100%;
+    gap: 0.25rem;
 
-    svg {
-        width: 100%;
-        height: 100%;
+    span {
+        font-weight: bolder;
     }
 }
 
@@ -144,7 +144,7 @@ dialog.modalDialog {
         padding-left: var(--space);
         border-right: 1px solid var(--c-p);
         flex-direction: column;
-        
+
         button {
             border-radius: calc(var(--br) * 2) 0 0 calc(var(--br) * 2);
             margin: 0 0 1px;

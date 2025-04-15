@@ -41,6 +41,7 @@ pub fn IconButton<I: IconShape + Clone + PartialEq + 'static>(
     icon: I,
     class: Option<String>,
     style: Option<String>,
+    text: Option<String>,
     onclick: Option<EventHandler<Event<MouseData>>>,
 ) -> Element {
     rsx! {
@@ -53,6 +54,11 @@ pub fn IconButton<I: IconShape + Clone + PartialEq + 'static>(
                 }
             },
             Icon { icon }
+            if let Some(s) = text {
+                span {
+                    {s}
+                }
+            }
         }
     }
 }
@@ -195,13 +201,13 @@ pub fn Panel(
     column: String,
     row: String,
     title: Option<String>,
+    class: Option<String>,
 ) -> Element {
     let has_title = title.is_some();
 
     rsx! {
         div {
-            class: "panel",
-            class: if has_title {"withTitle"} else {""},
+            class: format!("panel {} {}", if has_title {"withTitle"} else {""}, class.unwrap_or_default()),
             style: format!("grid-column: {column}; grid-row: {row}"),
             if let Some(title) = title {
                 h1 { class: "title", {title} }
