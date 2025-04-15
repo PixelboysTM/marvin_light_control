@@ -10,7 +10,7 @@ use mlc_communication::services::general::GeneralServiceIdent;
 use mlc_communication::services::project::ProjectServiceIdent;
 use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
 use mlc_communication::{services::*, ServiceIdentifiable, ServiceIdentifiableServer};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpListener;
 use tokio::select;
@@ -31,8 +31,8 @@ pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: Shutdo
 
     loop {
         select! {
-            _ = shutdown.wait(ShutdownPhase::Phase2) => {
-                log::info!("Shutting down Server! Not listening anymore.");
+            _ = shutdown.wait(ShutdownPhase::Phase1) => {
+                log::info!("Shutting down Server! Not accepting new connections anymore.");
                 break;
             }
             conn = listener.accept() => {
@@ -44,6 +44,10 @@ pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: Shutdo
 
         tokio::task::yield_now().await;
     }
+
+
+    shutdown.wait(ShutdownPhase::Phase2).await;
+    log::info!("Shutting down Server! Not listening anymore.");
 }
 
 fn handle_connection(

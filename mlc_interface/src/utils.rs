@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::toaster::ToastInfo;
 use dioxus::desktop::use_window;
+use dioxus::logger::tracing::info;
 use dioxus::{document::eval, prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
 use futures::StreamExt;
@@ -159,6 +160,7 @@ pub fn Modal<
     }
 }
 
+#[derive(Debug)]
 pub enum Screen {
     Connect,
     ProjectList,
@@ -168,6 +170,8 @@ pub enum Screen {
 }
 
 pub fn navigate(screen: Screen) {
+    info!("Navigating to {:?}", screen);
+
     navigator()
         .replace(match screen {
             Screen::Connect => "/",
