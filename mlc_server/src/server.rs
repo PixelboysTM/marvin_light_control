@@ -1,6 +1,7 @@
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
+use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::{AServiceImpl, ServiceImpl};
 use log::error;
 use mlc_communication::remoc::rtc::ServerBase;
@@ -16,7 +17,7 @@ use tokio::select;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: CancellationToken) {
+pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHandler) {
     log::info!("Starting Server...");
 
     log::info!("Listening on port {}", port);
@@ -30,7 +31,7 @@ pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: Cancel
 
     loop {
         select! {
-            _ = shutdown.cancelled() => {
+            _ = shutdown.wait(ShutdownPhase::Phase2) => {
                 log::info!("Shutting down Server! Not listening anymore.");
                 break;
             }
@@ -86,7 +87,7 @@ fn handle_connection(
                 return;
             }
         };
-        
+
         if let Err(e) = r {
             error!("{}", e);
         }

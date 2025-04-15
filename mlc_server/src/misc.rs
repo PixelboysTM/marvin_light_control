@@ -56,3 +56,60 @@ bitflags! {
         const SETTINGS =  0b00000100;
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct ShutdownHandler {
+    notifier: Arc<watch::Sender<ShutdownPhase>>,
+    _waiter: Arc<watch::Receiver<ShutdownPhase>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ShutdownPhase {
+    /// Currently not shutting down
+    None = 0,
+    /// Everything non-critical shutting down
+    Phase1 = 1,
+    /// Everything critical shutting down mainly the server
+    Phase2 = 2,
+    /// Shutdown should be complete
+    Done = 3,
+}
+
+impl ShutdownHandler {
+    pub fn create() -> Self {
+        let (tx, rx) = watch::channel(ShutdownPhase::None);
+
+        Self {
+            notifier: Arc::new(tx),
+            _waiter: Arc::new(rx),
+        }
+    }
+
+    pub fn advance(&self) -> impl Future<Output = ()> + 'static {
+        let next = match &*self.notifier.borrow() {
+            ShutdownPhase::None => ShutdownPhase::Phase1,
+            ShutdownPhase::Phase1 => ShutdownPhase::Phase2,
+            ShutdownPhase::Phase2 => ShutdownPhase::Done,
+            ShutdownPhase::Done => ShutdownPhase::Done,
+        };
+        self.notifier.send(next).debug_ignore();
+        // async {
+        tokio::task::yield_now()
+        // }
+    }
+
+    pub fn wait(&self, phase: ShutdownPhase) -> impl Future<Output = ()> {
+        let mut rx = self.notifier.subscribe();
+
+        async move {
+            loop {
+                if let Ok(()) = rx.changed().await {
+                    let sp = *rx.borrow_and_update();
+                    if phase <= sp {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}

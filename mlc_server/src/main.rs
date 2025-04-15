@@ -1,3 +1,4 @@
+use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::project::create_default_project;
 use log::{debug, error, info, trace, warn};
 use misc::{AdaptNotifier, AdaptScopes};
@@ -45,7 +46,7 @@ pub struct ServiceImpl {
     adapt_notifier: AdaptNotifier,
     ofl_library: mlc_ofl::OflLibrary,
     universe_runtime: Arc<UniverseRuntimeController>,
-    shutdown: CancellationToken,
+    shutdown: ShutdownHandler,
 }
 pub type AServiceImpl = Arc<ServiceImpl>;
 
@@ -107,13 +108,13 @@ async fn main() {
 
     let project = Arc::new(RwLock::new(create_default_project()));
     let adapt_notifier = AdaptNotifier::create();
-    let task_cancel_token = CancellationToken::new();
+    let shutdown_handler = ShutdownHandler::create();
 
     let lib_path = get_base_app_dir().join("library");
     tokio::fs::create_dir_all(&lib_path).await.ignore();
 
     let (universe_runtime_join, universe_runtime) = UniverseRuntime::start(
-        task_cancel_token.clone(),
+        shutdown_handler.clone(),
         adapt_notifier.clone(),
         project.clone(),
     );
@@ -126,7 +127,7 @@ async fn main() {
         adapt_notifier: adapt_notifier.clone(),
         ofl_library: OflLibrary::create(lib_path.join("ofl.json")),
         universe_runtime: Arc::new(universe_runtime),
-        shutdown: task_cancel_token.clone(),
+        shutdown: shutdown_handler.clone(),
     });
 
     let mut task_handles = vec![];
@@ -136,21 +137,21 @@ async fn main() {
     task_handles.spawn(setup_server(
         DEFAULT_SERVER_PORT,
         service_obj.clone(),
-        task_cancel_token.clone(),
+        shutdown_handler.clone(),
     ));
-    task_handles.spawn(create_shutdown_notifier(
+    task_handles.spawn(create_shutdown_handler(
         service_obj.clone(),
-        task_cancel_token.clone(),
+        shutdown_handler.clone(),
     ));
     task_handles.spawn(autosave_service(
         service_obj.clone(),
         adapt_notifier.clone(),
-        task_cancel_token.clone(),
+        shutdown_handler.clone(),
     ));
 
     let should_tui_exit = Arc::new(RwLock::new(false));
     let tui_handle = tokio::spawn(create_tui(
-        task_cancel_token.clone(),
+        shutdown_handler.clone(),
         should_tui_exit.clone(),
         service_obj.clone(),
         log_rx,
@@ -172,14 +173,18 @@ async fn main() {
     tui_handle.await.unwrap();
 }
 
-async fn create_shutdown_notifier(obj: AServiceImpl, task_cancel_token: CancellationToken) {
-    task_cancel_token.cancelled().await;
+async fn create_shutdown_handler(obj: AServiceImpl, shutdown: ShutdownHandler) {
+    shutdown.wait(ShutdownPhase::Phase1).await;
+    obj.send_info(Info::Shutdown);
 
     let mut p = obj.project.write().await;
     if obj.project_valid().await && p.settings.save_on_quit {
         p.save().await.unwrap();
     }
-    obj.send_info(Info::Shutdown);
+
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    shutdown.advance().await;
+    shutdown.advance().await;
 }
 
 fn setup_logging() -> DynamicResult<std::sync::mpsc::Receiver<Vec<u8>>> {
@@ -301,7 +306,7 @@ where
 async fn autosave_service(
     service_obj: AServiceImpl,
     adapt_notifier: AdaptNotifier,
-    shutdown: CancellationToken,
+    shutdown: ShutdownHandler,
 ) {
     fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         if valid {
@@ -325,7 +330,7 @@ async fn autosave_service(
             _ = adapt_notifier.wait(AdaptScopes::SETTINGS) => {
                 continue;
             }
-            _ = shutdown.cancelled() => {
+            _ = shutdown.wait(ShutdownPhase::Phase1) => {
                 break;
             }
             _ = duration => {

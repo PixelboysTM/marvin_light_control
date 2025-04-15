@@ -14,6 +14,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::{
     misc::{AdaptNotifier, AdaptScopes},
     project::Project,
@@ -112,7 +113,7 @@ pub enum UniverseUpdate {
 
 impl UniverseRuntime {
     pub fn start(
-        shutdown: CancellationToken,
+        shutdown: ShutdownHandler,
         adapt_notifier: AdaptNotifier,
         project: Arc<RwLock<Project>>,
     ) -> (JoinHandle<()>, UniverseRuntimeController) {
@@ -137,16 +138,12 @@ impl UniverseRuntime {
         )
     }
 
-    fn spawn(
-        mut self,
-        shutdown: CancellationToken,
-        adapt_notifier: AdaptNotifier,
-    ) -> JoinHandle<()> {
+    fn spawn(mut self, shutdown: ShutdownHandler, adapt_notifier: AdaptNotifier) -> JoinHandle<()> {
         tokio::spawn(async move {
             log::info!("Starting Universe Runtime");
             loop {
                 select! {
-                    _ = shutdown.cancelled() => {
+                    _ = shutdown.wait(ShutdownPhase::Phase1) => {
                         log::info!("Shutting down Universe Runtime!");
                         break;
                     }

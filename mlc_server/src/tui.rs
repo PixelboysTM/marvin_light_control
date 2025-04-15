@@ -20,10 +20,11 @@ use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
+use crate::misc::ShutdownHandler;
 use crate::AServiceImpl;
 
 pub async fn create_tui(
-    shutdown_handler: CancellationToken,
+    shutdown_handler: ShutdownHandler,
     exit_flag: Arc<RwLock<bool>>,
     service_obj: AServiceImpl,
     log_rx: std::sync::mpsc::Receiver<Vec<u8>>,
@@ -53,7 +54,7 @@ pub async fn create_tui(
 }
 
 pub struct TuiApp {
-    shutdown_handler: CancellationToken,
+    shutdown_handler: ShutdownHandler,
     exit_flag: Arc<RwLock<bool>>,
     service_obj: AServiceImpl,
     tui_state: TuiAppState,
@@ -209,7 +210,7 @@ impl TuiApp {
                 self.tui_state.exit = match self.tui_state.exit {
                     ExitState::Idle => ExitState::UserConfirm,
                     ExitState::UserConfirm => {
-                        self.shutdown_handler.cancel();
+                        tokio::task::spawn(self.shutdown_handler.advance());
                         ExitState::Exiting
                     }
                     ExitState::Exiting => ExitState::Quit,
@@ -217,7 +218,7 @@ impl TuiApp {
                 }
             }
             KeyCode::Char('y') if self.tui_state.exit == ExitState::UserConfirm => {
-                self.shutdown_handler.cancel();
+                tokio::task::spawn(self.shutdown_handler.advance());
                 self.tui_state.exit = ExitState::Exiting;
             }
             KeyCode::Char('n') if self.tui_state.exit == ExitState::UserConfirm => {

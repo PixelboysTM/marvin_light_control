@@ -1,4 +1,4 @@
-use crate::misc::AdaptScopes;
+use crate::misc::{AdaptScopes, ShutdownPhase};
 use crate::project::project_loader::Plm;
 use crate::universe::{RuntimeCommand, UniverseUpdate};
 use crate::ServiceImpl;
@@ -142,7 +142,7 @@ impl ProjectService for ServiceImpl {
             let mut sub = controller.subscribe_universe(universe);
             loop {
                 select! {
-                    _ = shutdown.cancelled() => break,
+                    _ = shutdown.wait(ShutdownPhase::Phase1) => break,
                     Ok(update) = sub.recv() => {
                         match update {
                             UniverseUpdate::Single{ update } => {

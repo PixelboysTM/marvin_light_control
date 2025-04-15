@@ -215,8 +215,10 @@ fn ProjectLayout() -> Element {
                             ToastInfo::info("Autosaved", "The backend autosaved").post();
                         }
                         Info::Shutdown => {
+                            error!("Got shut down");
                             ToastInfo::info("Shutdown", "The backend shutdown!s").post();
                             navigate(Screen::Connect);
+                            break;
                         }
                         Info::Idle => {}
                         Info::Saved => {
@@ -236,8 +238,9 @@ fn ProjectLayout() -> Element {
                     }
                 }
                 Ok(_) = status_sub.changed() => {
-                    let status = status_sub.borrow_and_update().unwrap().clone();
-                    status_msg.set(status);
+                    if let Ok(status) = status_sub.borrow_and_update() {
+                        status_msg.set(status.clone());
+                    }
                 }
             }
         }
