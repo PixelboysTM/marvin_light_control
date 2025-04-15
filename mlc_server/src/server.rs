@@ -1,21 +1,15 @@
 use std::net::Ipv4Addr;
-use std::sync::Arc;
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::{AServiceImpl, ServiceImpl};
+use crate::AServiceImpl;
 use log::error;
-use mlc_communication::remoc::rtc::ServerBase;
-use mlc_communication::remoc::{self, prelude::*};
 use mlc_communication::services::general::GeneralServiceIdent;
 use mlc_communication::services::project::ProjectServiceIdent;
 use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
-use mlc_communication::{services::*, ServiceIdentifiable, ServiceIdentifiableServer};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use mlc_communication::{ServiceIdentifiable, ServiceIdentifiableServer};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::select;
-use tokio::sync::RwLock;
-use tokio_util::sync::CancellationToken;
 
 pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHandler) {
     log::info!("Starting Server...");
@@ -44,7 +38,6 @@ pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: Shutdo
 
         tokio::task::yield_now().await;
     }
-
 
     shutdown.wait(ShutdownPhase::Phase2).await;
     log::info!("Shutting down Server! Not listening anymore.");

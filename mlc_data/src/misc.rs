@@ -1,5 +1,6 @@
 use crate::DynamicError;
-use log::{debug, error};
+use log::error;
+use std::error;
 use std::fmt::{Debug, Formatter};
 
 #[macro_export]
@@ -23,7 +24,7 @@ macro_rules! err {
 pub struct ContextError {
     pub filename: &'static str,
     pub line: u32,
-    pub error: Box<dyn std::error::Error>,
+    pub error: Box<dyn error::Error>,
 }
 
 impl Debug for ContextError {
@@ -42,14 +43,14 @@ pub trait ErrIgnore {
     fn ignore(self);
     fn bin(self)
     where
-        Self: std::marker::Sized,
+        Self: Sized,
     {
         self.ignore();
     }
 
     fn debug_ignore(self)
     where
-        Self: std::marker::Sized + std::fmt::Debug,
+        Self: Sized + Debug,
     {
     }
 }
@@ -58,7 +59,7 @@ impl<T, E: Debug> ErrIgnore for Result<T, E> {
     fn ignore(self) {}
     fn debug_ignore(self)
     where
-        Self: std::marker::Sized + std::fmt::Debug,
+        Self: Sized + Debug,
     {
         match self {
             Ok(_) => self.ignore(),

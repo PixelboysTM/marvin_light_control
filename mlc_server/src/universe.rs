@@ -12,7 +12,6 @@ use tokio::{
     },
     task::JoinHandle,
 };
-use tokio_util::sync::CancellationToken;
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::{
@@ -107,7 +106,7 @@ pub enum UniverseUpdate {
     },
     Entire {
         universe: UniverseId,
-        values: [u8; UNIVERSE_SIZE],
+        values: Box<[u8; UNIVERSE_SIZE]>,
     },
 }
 
@@ -191,7 +190,7 @@ impl UniverseRuntime {
                     }
                     UniverseUpdate::Entire { universe, values } => {
                         if let Some(data) = self.runtime_universes.get_mut(*universe as usize - 1) {
-                            *data = *values;
+                            *data = **values;
                         }
                     }
                 }
@@ -207,7 +206,7 @@ impl UniverseRuntime {
             self.update_notifier
                 .send(UniverseUpdate::Entire {
                     universe,
-                    values: data.clone(),
+                    values: Box::new(*data),
                 })
                 .debug_ignore();
         } else {
@@ -226,7 +225,7 @@ impl UniverseRuntime {
             self.update_notifier
                 .send(UniverseUpdate::Entire {
                     universe: (i + 1) as u16,
-                    values: u.clone(),
+                    values: Box::new(*u),
                 })
                 .debug_ignore();
         }

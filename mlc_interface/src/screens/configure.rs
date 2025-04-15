@@ -5,15 +5,12 @@ use crate::utils::{
     SignalNotify, Symbol, TabController, TabItem, Tabs,
 };
 use crate::ADD_FIXTURE_MODAL;
-use dioxus::html::g::orientation;
-use dioxus::html::li::value;
 use dioxus::prelude::*;
-use dioxus::CapturedError;
 use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencilRuler};
 use futures::StreamExt;
 use itertools::Itertools;
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
-use mlc_data::fixture::blueprint::{Channel, ChannelIdentifier, FixtureBlueprint};
+use mlc_data::fixture::blueprint::{Channel, FixtureBlueprint};
 use mlc_data::misc::ErrIgnore;
 use mlc_data::project::universe::{UniverseAddress, UniverseId, UNIVERSE_SIZE};
 use tokio::select;
@@ -100,7 +97,7 @@ fn FixtureCatalog(prj_service: SClient<ProjectServiceIdent>) -> Element {
         }
     });
 
-    let mut details_mode = use_signal(|| BlueprintDetailsMode::Inspect);
+    let details_mode = use_signal(|| BlueprintDetailsMode::Inspect);
     let mut detailed_blueprint_indent = use_signal(String::new);
 
     rsx! {
@@ -364,7 +361,7 @@ fn AddFixtureBlueprintModal(
     }
 }
 
-enum FCC {
+enum Fcc {
     SwitchUniverse(UniverseId),
     SetValue { adds: UniverseAddress, value: u8 },
 }
@@ -379,20 +376,20 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
 
     let mut data = use_signal(|| [0_u8; UNIVERSE_SIZE]);
 
-    let value_setter = use_coroutine(move |mut rx: UnboundedReceiver<FCC>| async move {
+    let value_setter = use_coroutine(move |mut rx: UnboundedReceiver<Fcc>| async move {
         let mut recv = None;
         let mut send = None;
         loop {
             select! {
                 Some(d) = rx.next() => {
                     match d {
-                        FCC::SwitchUniverse(u) => {
+                        Fcc::SwitchUniverse(u) => {
                             if let Ok(x) = prj.read().universe_sub(u).await {
                                 recv = Some(x.0);
                                 send = Some(x.1);
                             }
                         }
-                        FCC::SetValue{adds, value: v } => {
+                        Fcc::SetValue{adds, value: v } => {
                             if let Some(x) = &send {
                                 x.send((adds, v)).await.debug_ignore();
                             }
@@ -410,7 +407,7 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
 
     use_effect(move || {
         let u = tabs.read().get();
-        value_setter.send(FCC::SwitchUniverse(u));
+        value_setter.send(Fcc::SwitchUniverse(u));
     });
 
     rsx! {
@@ -430,7 +427,7 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
                         }
                         Fader {
                             value: data.map(move |d| &d[i]),
-                            update: move |d| {value_setter.send(FCC::SetValue {
+                            update: move |d| {value_setter.send(Fcc::SetValue {
                                 adds: UniverseAddress::create(i + 1),
                                 value: d,
                             })},

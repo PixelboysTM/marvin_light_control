@@ -18,9 +18,8 @@ use std::io::Write;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::select;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 use tracing::level_filters::LevelFilter;
 use tracing::Level;
 use tracing_log::LogTracer;
@@ -44,7 +43,7 @@ pub struct ServiceImpl {
     info: Sender<Info>,
     status: Sender<String>,
     adapt_notifier: AdaptNotifier,
-    ofl_library: mlc_ofl::OflLibrary,
+    ofl_library: OflLibrary,
     universe_runtime: Arc<UniverseRuntimeController>,
     shutdown: ShutdownHandler,
 }
@@ -60,10 +59,10 @@ impl ServiceImpl {
 
 #[rtc::async_trait]
 impl com::services::general::GeneralService for ServiceImpl {
-    async fn alive(&self) -> Result<Alive, rtc::CallError> {
+    async fn alive(&self) -> Result<Alive, CallError> {
         Ok(Alive)
     }
-    async fn is_valid_view(&self, view: View) -> Result<bool, rtc::CallError> {
+    async fn is_valid_view(&self, view: View) -> Result<bool, CallError> {
         Ok(match view {
             View::Project => !*self.valid_project.read().await,
             View::Edit => *self.valid_project.read().await,
@@ -193,11 +192,12 @@ fn setup_logging() -> DynamicResult<std::sync::mpsc::Receiver<Vec<u8>>> {
     let (w, rx) = FuturesWriter::new();
 
     let debug = {
-        let mut d = false;
+        #[cfg(not(debug_assertions))]
+        let d = false;
+
         #[cfg(debug_assertions)]
-        {
-            d = true;
-        }
+        let d = true;
+
         d
     };
 

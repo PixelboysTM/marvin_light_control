@@ -1,4 +1,3 @@
-use crate::bounded::bounds::Zero;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::{
@@ -187,10 +186,7 @@ impl<T: Display, MIN: Bounds<T>, MAX: Bounds<T>, H> Display for BoundedValue<T, 
 }
 
 pub mod bounds {
-    use std::marker::PhantomData;
-
     use super::Bounds;
-
     #[derive(Debug)]
     pub struct Zero;
     #[derive(Debug)]

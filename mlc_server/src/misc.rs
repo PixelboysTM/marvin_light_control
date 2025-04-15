@@ -28,7 +28,7 @@ impl AdaptNotifier {
         let mut rx = self.notifier.subscribe();
 
         async move {
-            let mut scs = AdaptScopes::empty();
+            let scs;
             loop {
                 if let Ok(()) = rx.changed().await {
                     let sc = *rx.borrow_and_update();

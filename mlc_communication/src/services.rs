@@ -2,7 +2,6 @@ pub mod general {
     use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use macro_rules_attribute::derive;
 
-    use crate::services::project::ProjectServiceError;
     use remoc::{rch::watch, rtc};
 
     pub struct GeneralServiceIdent;

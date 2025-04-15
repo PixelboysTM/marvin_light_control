@@ -127,11 +127,7 @@ impl OflLibrary {
         C: Fn(String),
     {
         if *self.state.lock().await == OflState::Uninitialized {
-            self.init(if let Some(c) = &status_callback {
-                Some(|s| c(s))
-            } else {
-                None
-            })
+            self.init(status_callback.as_ref().map(|c| |s| c(s)))
             .await;
         }
 

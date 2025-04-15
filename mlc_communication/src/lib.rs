@@ -24,27 +24,29 @@ pub trait ServiceIdentifiable {
 pub trait ServiceIdentifiableServer<T: Send + Sync + 'static>: ServiceIdentifiable {
     type S;
 
-    async fn spinup(
+    fn spinup(
         service: Arc<T>,
         socket_rx: OwnedReadHalf,
         socket_tx: OwnedWriteHalf,
-    ) -> DynamicResult<()>
+    ) -> impl Future<Output = DynamicResult<()>>
     where
         <Self as ServiceIdentifiableServer<T>>::S: ServerBase,
         <Self as ServiceIdentifiableServer<T>>::S: ServerShared<T, remoc::codec::Default>,
         <<Self as ServiceIdentifiableServer<T>>::S as ServerBase>::Client: Clone + RemoteSend,
     {
-        let (server, client) = Self::S::new(service, 1);
+        async {
+            let (server, client) = Self::S::new(service, 1);
 
-        remoc::Connect::io(remoc::Cfg::default(), socket_rx, socket_tx)
-            .provide(client)
-            .await?;
+            remoc::Connect::io(remoc::Cfg::default(), socket_rx, socket_tx)
+                .provide(client)
+                .await?;
 
-        server.serve(true).await?;
-        log::info!(
-            "Closing connection for ident: {}",
-            String::from_utf8_lossy(&Self::IDENT).to_string()
-        );
-        Ok(())
+            server.serve(true).await?;
+            log::info!(
+                "Closing connection for ident: {}",
+                String::from_utf8_lossy(&Self::IDENT)
+            );
+            Ok(())
+        }
     }
 }

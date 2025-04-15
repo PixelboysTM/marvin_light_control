@@ -7,7 +7,6 @@ edition.workspace = true
 
 [dependencies]
 tokio.workspace = true
-tokio-util = "0.7.14"
 mlc_communication = { path = "../mlc_communication" }
 mlc_ofl = { path = "../mlc_ofl" }
 mlc_data = { path = "../mlc_data" }
@@ -18,7 +17,6 @@ tracing-log = "0.2.0"
 ansi-to-tui = "7.0.0"
 chrono = "*"
 ratatui = { version = "0.29.0", features = ["all-widgets"] }
-tui-logger = "0.17.0"
 serde.workspace = true
 bson.workspace = true
 json5.workspace = true

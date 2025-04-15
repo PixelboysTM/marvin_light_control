@@ -179,7 +179,7 @@ pub fn Projects() -> Element {
                         return;
                     }
 
-                    let id = s2.read().create(new_project_name.read().clone(), new_project_type.read().clone()).await.expect("Couldn't create project");
+                    let id = s2.read().create(new_project_name.read().clone(), *new_project_type.read()).await.expect("Couldn't create project");
                         let r = s2.read().open(id).await.expect("Couldn't open project");
                         if r {
                             navigate(Screen::Configure);

@@ -25,6 +25,7 @@ use mlc_data::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::select;
@@ -210,7 +211,7 @@ fn to_pc_err(e: String) -> ProjectSelectionServiceError {
     ProjectSelectionServiceError::ProjectCreateError(e)
 }
 
-fn to_po_err<E: std::error::Error>(e: E) -> ProjectSelectionServiceError {
+fn to_po_err<E: error::Error>(e: E) -> ProjectSelectionServiceError {
     error!("project open error: {:?}", e);
     ProjectSelectionServiceError::ProjectOpenError(format!("{e:?}"))
 }
@@ -401,7 +402,7 @@ pub fn get_base_app_dir() -> PathBuf {
 impl Project {
     pub async fn save(&mut self) -> Result<(), String> {
         let identifier = self.metadata.file_name.clone();
-        let kind = self.metadata.project_type.clone();
+        let kind = self.metadata.project_type;
 
         self.metadata.last_saved = Local::now();
         self.metadata.file_name = "".to_owned();

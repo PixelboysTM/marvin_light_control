@@ -4,7 +4,6 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Alignment;
 use ratatui::prelude::Margin;
 use ratatui::prelude::StatefulWidget;
-use ratatui::text::Text;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers}, layout::{Constraint, Direction, Flex, Layout, Rect},
@@ -18,7 +17,6 @@ use ratatui::{
 use std::{io, sync::Arc, time::Duration};
 use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
-use tokio_util::sync::CancellationToken;
 
 use crate::misc::ShutdownHandler;
 use crate::AServiceImpl;

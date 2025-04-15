@@ -1,13 +1,12 @@
 use crate::screens::{BLUEPRINTS_CHANGED, UNIVERSE_LIST_CHANGED};
-use crate::utils::{navigate, Branding, IconButton, ModalResult, Screen};
-use connect::{connect_url, use_service, RtcSuspend, SClient};
+use crate::utils::{navigate, Branding, IconButton, Screen};
+use connect::{connect_url, use_service};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use dioxus::{desktop::Config, logger::tracing::error};
 use dioxus_free_icons::icons::ld_icons::{
-    LdCloudUpload, LdCog, LdLamp, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
+    LdCloudUpload, LdCog, LdLightbulb, LdPencil, LdSave, LdTabletSmartphone,
 };
-use itertools::Itertools;
 use log::{info, warn};
 use mlc_communication::services::general::{GeneralService, GeneralServiceIdent, Info};
 use mlc_communication::services::general::{ProjectInfo, View as SView};
@@ -19,7 +18,7 @@ use std::{
 };
 use toaster::{ToastInfo, ToasterProvider};
 use tokio::select;
-use utils::{Loader, Modal, ModalVariant, Symbol};
+use utils::{Loader, Symbol};
 
 mod connect;
 mod toaster;

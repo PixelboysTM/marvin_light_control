@@ -11,11 +11,8 @@ mlc_communication = { path = "../mlc_communication" }
 mlc_data = { path = "../mlc_data" }
 dioxus = { version = "0.6.0", features = ["router"] }
 dioxus-free-icons = { version = "0.9.0", features = ["lucide"] }
-serde.workspace = true
 futures.workspace = true
-serde_json = "1.0.139"
 tokio.workspace = true
-chrono = { version = "0.4.40", features = ["serde"] }
 log = "0.4.26"
 uuid = { version = "1.15.1", features = ["v4"] }
 fuzzy-matcher = "*"

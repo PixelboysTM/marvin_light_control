@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::ops::{Deref, DerefMut};
 
 use crate::toaster::ToastInfo;
@@ -6,7 +5,6 @@ use dioxus::desktop::use_window;
 use dioxus::logger::tracing::info;
 use dioxus::{document::eval, prelude::*};
 use dioxus_free_icons::{icons::ld_icons::LdX, Icon, IconShape};
-use futures::StreamExt;
 use mlc_communication::remoc::rch::mpsc::{Receiver, RecvError};
 use uuid::Uuid;
 
@@ -346,7 +344,7 @@ impl<T: Clone> Clone for UniqueEq<T> {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
-            id: self.id.clone(),
+            id: self.id,
         }
     }
 }
