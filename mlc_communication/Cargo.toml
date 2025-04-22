@@ -18,5 +18,6 @@ async-trait.workspace = true
 remoc = { version = "^0.15", default-features = false, features = [
     "full",
     "codec-bincode",
-    "default-codec-json",
+    "codec-ciborium",
+    "default-codec-ciborium",
 ] }

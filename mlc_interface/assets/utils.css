@@ -198,7 +198,7 @@ input.fader {
         border: 1px solid var(--c-disabled);
     }
 
-    &:hover::-webkit-slider-thumb {
+    &::-webkit-slider-thumb:hover {
         border: 1px solid var(--c-p);
     }
 

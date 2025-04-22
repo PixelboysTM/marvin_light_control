@@ -329,7 +329,7 @@ pub fn Fader(
         input {
             class: format!("fader {}", class.unwrap_or_default()),
             value: 255 - value(),
-            onchange: move |d| {
+            oninput: move |d| {
                 if let Ok(v) = d.value().parse::<u8>() {
                     update.call(255 - v);
                 }

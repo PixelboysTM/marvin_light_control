@@ -455,6 +455,8 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
     }
 }
 
+const ENDPOINT_MAPPING_MODAL: Symbol = Symbol::create("endpoint-mapping");
+
 #[component]
 fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
     rsx! {
@@ -512,7 +514,25 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
 
                 IconButton {
                     icon: LdRoute,
-                    text: "Endpoint Mappings"
+                    text: "Endpoint Mappings",
+                    onclick: move |_| async move {
+                        ENDPOINT_MAPPING_MODAL.open().await;
+                    }
+                }
+            }
+        }
+
+        Modal {
+            title: "Endpoint Mappings",
+            ident: ENDPOINT_MAPPING_MODAL,
+            variant: ModalVariant::OkCancel,
+            icon: LdRoute,
+            oktext: "Save",
+            onexit: move |a| async move{
+                if a == ModalResult::Success {
+                    // if let Err(e) = prj.read().save_endpoint_mappings().await {
+                    //     ToastInfo::error("Failed to save endpoint mappings!", e.to_string()).post();
+                    // }
                 }
             }
         }

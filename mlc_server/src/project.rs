@@ -375,16 +375,10 @@ impl Project {
                 autosave: Some(Duration::from_secs(30 * 60)),
                 save_on_quit: true,
             },
-            universes: vec![
-                FixtureUniverse {
-                    addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
-                    fixtures: HashMap::new(),
-                },
-                FixtureUniverse {
-                    addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
-                    fixtures: HashMap::new(),
-                },
-            ],
+            universes: vec![FixtureUniverse {
+                addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
+                fixtures: HashMap::new(),
+            }],
         }
     }
 }

@@ -34,6 +34,10 @@
     --fader-height: 12rem;
 }
 
+html {
+    color-scheme: dark;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -124,7 +128,6 @@ input {
 button {
     background-color: var(--c-btn);
     outline: none;
-    border: none;
     border-radius: calc(2 * var(--br));
     margin: 0.2rem;
     padding: 0.2rem 0.5rem;
