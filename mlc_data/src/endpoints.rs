@@ -1,6 +1,7 @@
 use crate::project::universe::UniverseId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EndpointMapping {
@@ -15,17 +16,17 @@ pub enum EndpointConfig {
     Usb { port: String, speed: EndpointSpeed },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EndpointSpeed {
     Slow,
     Medium,
     Fast,
     Ultra,
-    Custom(u32),
+    Custom(u64),
 }
 
 impl EndpointSpeed {
-    pub fn ms(&self) -> u32 {
+    pub fn ms(&self) -> u64 {
         match self {
             EndpointSpeed::Slow => 200,
             EndpointSpeed::Medium => 100,
@@ -33,5 +34,8 @@ impl EndpointSpeed {
             EndpointSpeed::Ultra => 5,
             EndpointSpeed::Custom(ms) => *ms,
         }
+    }
+    pub fn duration(&self) -> Duration {
+        Duration::from_millis(self.ms())
     }
 }

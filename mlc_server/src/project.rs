@@ -3,7 +3,6 @@ use crate::project::project_loader::Plm;
 use crate::universe::{RuntimeCommand, UniverseUpdate};
 use crate::ServiceImpl;
 use chrono::Local;
-use log::{error, info, warn};
 use mlc_communication::remoc::rch::mpsc::{Receiver, Sender};
 use mlc_communication::remoc::rtc;
 use mlc_communication::services::general::{Info, ProjectInfo};
@@ -13,7 +12,7 @@ use mlc_communication::services::project::{
 use mlc_communication::services::project_selection::{
     ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
 };
-use mlc_data::endpoints::{EndpointConfig, EndpointMapping};
+use mlc_data::endpoints::{EndpointConfig, EndpointMapping, EndpointSpeed};
 use mlc_data::misc::ErrIgnore;
 use mlc_data::project::universe::{
     FixtureAddress, FixtureUniverse, UniverseAddress, UniverseId, UniverseSlot, UNIVERSE_SIZE,
@@ -31,6 +30,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use tracing::{error, info, warn};
 
 mod project_loader;
 
@@ -335,7 +335,7 @@ impl ProjectSelectionService for ServiceImpl {
                 }
             }
             Err(e) => {
-                log::error!("Couldn't get base project dir: {e}");
+                error!("Couldn't get base project dir: {e}");
             }
         }
 
@@ -396,7 +396,7 @@ impl Project {
                 fixtures: HashMap::new(),
             }],
             endpoint_mapping: EndpointMapping {
-                endpoints: HashMap::from([(1 as UniverseId, vec![EndpointConfig::Logger])]),
+                endpoints: HashMap::new(),
             },
         }
     }
@@ -408,7 +408,7 @@ pub fn create_default_project() -> Project {
 
 pub fn get_base_app_dir() -> PathBuf {
     let project_dirs = directories::ProjectDirs::from("de", "timfritzen", "marvin_light_control")
-        .expect("Could not get project directory");
+        .expect("Could not get the project directory");
     project_dirs.data_dir().to_path_buf()
 }
 

@@ -37,7 +37,7 @@ impl AdaptNotifier {
                         scs = sc;
                         break;
                     } else {
-                        log::info!("Adapt received but didn't matched listened scopes")
+                        info!("Adapt received but didn't match listened scopes")
                     }
                 }
             }

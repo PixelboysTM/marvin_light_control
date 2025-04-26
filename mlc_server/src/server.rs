@@ -1,8 +1,7 @@
 use std::net::Ipv4Addr;
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::{AServiceImpl, MlcService, MlcServiceResources, MlcServiceSimple, DEFAULT_SERVER_PORT};
-use log::error;
+use crate::{AServiceImpl, MlcServiceResources, MlcServiceSimple, DEFAULT_SERVER_PORT};
 use mlc_communication::services::general::GeneralServiceIdent;
 use mlc_communication::services::project::ProjectServiceIdent;
 use mlc_communication::services::project_selection::ProjectSelectionServiceIdent;
@@ -10,6 +9,7 @@ use mlc_communication::{ServiceIdentifiable, ServiceIdentifiableServer};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::select;
+use tracing::{error, info};
 
 pub struct ServerService;
 
@@ -24,9 +24,9 @@ impl MlcServiceSimple for ServerService {
 }
 
 async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHandler) {
-    log::info!("Starting Server...");
+    info!("Starting Server...");
 
-    log::info!("Listening on port {}", port);
+    info!("Listening on port {}", port);
     let listener = match TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).await {
         Ok(l) => l,
         Err(e) => {
@@ -38,11 +38,11 @@ async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHa
     loop {
         select! {
             _ = shutdown.wait(ShutdownPhase::Phase1) => {
-                log::info!("Shutting down Server! Not accepting new connections anymore.");
+                info!("Shutting down Server! Not accepting new connections anymore.");
                 break;
             }
             conn = listener.accept() => {
-                log::info!("New connection");
+                info!("New connection");
                 let (socket, addr) = conn.unwrap();
                 handle_connection(&service_obj, socket, addr);
             }
@@ -52,7 +52,7 @@ async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHa
     }
 
     shutdown.wait(ShutdownPhase::Phase2).await;
-    log::info!("Shutting down Server! Not listening anymore.");
+    info!("Shutting down Server! Not listening anymore.");
 }
 
 fn handle_connection(
@@ -63,17 +63,17 @@ fn handle_connection(
     let service_obj = service_obj.clone();
     tokio::spawn(async move {
         let (mut socket_rx, socket_tx) = socket.into_split();
-        log::info!("Accepted connection from {}", addr);
+        info!("Accepted connection from {}", addr);
 
         let mut buffer = [0; 5];
         let amount = socket_rx.read(&mut buffer).await.unwrap();
         if amount != 5 {
-            log::error!("First message wasn't 5 long rejecting!");
+            error!("The first message wasn't 5 long rejecting!");
         }
 
         let ident = String::from_utf8_lossy(&buffer).to_string();
 
-        log::info!("Got ident msg: {}", ident);
+        info!("Got ident msg: {}", ident);
 
         // let service_idents: Vec<Box<dyn ServiceIdentifiableServer<ServiceImpl>>> = vec![
         //     Box::new(project_selection::ProjectSelectionServiceIdent),
@@ -92,7 +92,7 @@ fn handle_connection(
                 ProjectServiceIdent::spinup(service_obj, socket_rx, socket_tx).await
             }
             _ => {
-                log::error!("Identifier was not valid!");
+                error!("Identifier was not valid!");
                 return;
             }
         };

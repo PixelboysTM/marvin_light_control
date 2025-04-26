@@ -10,7 +10,6 @@ tokio.workspace = true
 mlc_communication = { path = "../mlc_communication" }
 mlc_ofl = { path = "../mlc_ofl" }
 mlc_data = { path = "../mlc_data" }
-log.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.19", features = ["json", "time"] }
 tracing-log = "0.2.0"
@@ -27,3 +26,4 @@ lazy_static = "1.5.0"
 textwrap = "0.16.2"
 bitflags = "2.9.0"
 circular-buffer = "1.1.0"
+sacn = "0.10.0"

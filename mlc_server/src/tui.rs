@@ -1,3 +1,5 @@
+use crate::misc::{ShutdownHandler, ShutdownPhase};
+use crate::{AServiceImpl, MlcService, MlcServiceResources};
 use ansi_to_tui::IntoText;
 use circular_buffer::CircularBuffer;
 use ratatui::buffer::Buffer;
@@ -17,9 +19,7 @@ use ratatui::{
 use std::{io, sync::Arc, time::Duration};
 use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
-
-use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::{AServiceImpl, MlcService, MlcServiceResources};
+use tracing::info;
 
 pub struct TuiService;
 
@@ -41,7 +41,7 @@ async fn create_tui(
     service_obj: AServiceImpl,
     log_rx: std::sync::mpsc::Receiver<Vec<u8>>,
 ) {
-    log::info!("Starting Ratatui...");
+    info!("Starting Ratatui...");
     let mut terminal = ratatui::init();
     let app_result = TuiApp {
         shutdown_handler,

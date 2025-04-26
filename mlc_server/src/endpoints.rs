@@ -1,11 +1,17 @@
-use crate::endpoints::driver::LogDriver;
+use crate::endpoints::driver_log::LogDriver;
+use crate::endpoints::driver_sacn::SacnDriver;
 use crate::misc::{AdaptNotifier, AdaptScopes, ShutdownHandler, ShutdownPhase};
-use crate::universe::UniverseUpdateSubscriber;
+use crate::universe::{UniverseUpdate, UniverseUpdateSubscriber};
 use crate::{AServiceImpl, MlcServiceResources, MlcServiceSimple};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use mlc_data::endpoints::{EndpointConfig, EndpointMapping};
 use tokio::select;
+use tokio::sync::broadcast::error::RecvError;
+use tracing::info;
 
-mod driver;
+mod driver_log;
+mod driver_sacn;
 
 pub struct EndpointsManagerService;
 
@@ -29,7 +35,7 @@ async fn start_endpoint_manager(
     let mut drivers = DriverCollection {
         log: LogDriver::new(),
         artnet: LogDriver::new(),
-        sacn: LogDriver::new(),
+        sacn: SacnDriver::new(),
         usb: LogDriver::new(),
     };
 
@@ -51,7 +57,7 @@ async fn start_endpoint_manager(
 struct DriverCollection {
     log: LogDriver,
     artnet: LogDriver,
-    sacn: LogDriver,
+    sacn: SacnDriver,
     usb: LogDriver,
 }
 
@@ -71,8 +77,8 @@ impl DriverCollection {
             EndpointConfig::ArtNet => {
                 self.artnet.apply_config(sub, ()).await;
             }
-            EndpointConfig::Sacn { .. } => {
-                self.sacn.apply_config(sub, ()).await;
+            EndpointConfig::Sacn { speed, universe } => {
+                self.sacn.apply_config(sub, (*speed, *universe)).await;
             }
             EndpointConfig::Usb { .. } => {
                 self.usb.apply_config(sub, ()).await;
@@ -103,4 +109,16 @@ async fn adapt_endpoints(
 trait EndpointDriver<C> {
     async fn stop_all(&mut self);
     async fn apply_config(&mut self, sub: UniverseUpdateSubscriber, config: C);
+}
+
+async fn await_subs(
+    subs: &mut [UniverseUpdateSubscriber],
+) -> Option<Result<UniverseUpdate, RecvError>> {
+    info!("Waiting for universe updates");
+
+    let mut f = FuturesUnordered::new();
+    for sub in subs {
+        f.push(sub.recv());
+    }
+    f.next().await
 }

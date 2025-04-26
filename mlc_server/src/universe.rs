@@ -1,5 +1,11 @@
 use std::sync::Arc;
 
+use crate::misc::{ShutdownHandler, ShutdownPhase};
+use crate::{
+    misc::{AdaptNotifier, AdaptScopes}, project::Project, MlcService,
+    MlcServiceResources,
+    MlcServiceSimple,
+};
 use mlc_data::{
     misc::ErrIgnore,
     project::universe::{FixtureAddress, UniverseId, UNIVERSE_SIZE},
@@ -12,9 +18,7 @@ use tokio::{
     },
     task::JoinHandle,
 };
-
-use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::{misc::{AdaptNotifier, AdaptScopes}, project::Project, MlcService, MlcServiceResources, MlcServiceSimple};
+use tracing::{info, trace};
 
 pub struct UniverseRuntimeService {
     update_notifier: Sender<UniverseUpdate>,
@@ -40,14 +44,14 @@ impl UniverseRuntimeService {
 }
 
 impl MlcServiceSimple for UniverseRuntimeService {
-    fn start(self, res: &MlcServiceResources) -> impl Future<Output=()> + Send + 'static {
+    fn start(self, res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
         let runtime = UniverseRuntime {
             cmd_recv: self.cmd_recv,
             update_notifier: self.update_notifier,
             runtime_universes: vec![],
             project: res.service_obj.project.clone(),
         };
-        
+
         runtime.spawn(res.shutdown.clone(), res.adapt_notifier.clone())
     }
 }
@@ -118,6 +122,10 @@ impl UniverseUpdateSubscriber {
             }
         }
     }
+
+    pub fn universe(&self) -> UniverseId {
+        self.universe_id
+    }
 }
 
 #[derive(Debug)]
@@ -174,11 +182,11 @@ impl UniverseRuntime {
     }
 
     async fn spawn(mut self, shutdown: ShutdownHandler, adapt_notifier: AdaptNotifier) {
-        log::info!("Starting Universe Runtime");
+        info!("Starting Universe Runtime");
         loop {
             select! {
                 _ = shutdown.wait(ShutdownPhase::Phase1) => {
-                    log::info!("Shutting down Universe Runtime!");
+                    info!("Shutting down Universe Runtime!");
                     break;
                 }
                 _ = adapt_notifier.wait(AdaptScopes::UNIVERSES) => {
@@ -189,12 +197,12 @@ impl UniverseRuntime {
                 }
             }
         }
-        log::info!("Exiting Universe Runtime");
+        info!("Exiting Universe Runtime");
     }
 
     #[tracing::instrument]
     async fn handle_cmd(&mut self, cmd: RuntimeCommand) {
-        log::trace!("Starting RuntimeCommand Handling");
+        trace!("Starting RuntimeCommand Handling");
         match cmd {
             RuntimeCommand::ResendUniverses => {
                 for u in 1..=self.runtime_universes.len() {
@@ -232,7 +240,7 @@ impl UniverseRuntime {
                 self.update_notifier.send(update).debug_ignore();
             }
         }
-        log::trace!("Finished RuntimeCommand Handling");
+        trace!("Finished RuntimeCommand Handling");
     }
 
     async fn send_universe(&mut self, universe: UniverseId) {
@@ -244,13 +252,13 @@ impl UniverseRuntime {
                 })
                 .debug_ignore();
         } else {
-            tracing::error!("Send Universe requested for invalid universe");
+            tracing::error!("Send Universe requested for an invalid universe");
         };
     }
 
     #[tracing::instrument]
     async fn adapt(&mut self) {
-        log::info!("Adapting");
+        info!("Adapting");
         let p = self.project.read().await;
         self.runtime_universes
             .resize(p.universes.len(), [0; UNIVERSE_SIZE]);
