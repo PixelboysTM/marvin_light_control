@@ -23,9 +23,11 @@ async fn create_shutdown_handler(obj: AServiceImpl, shutdown: ShutdownHandler) {
         p.save().await.unwrap();
     }
 
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    shutdown.advance().await;
-    shutdown.advance().await;
+    // tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    while shutdown.current() != ShutdownPhase::Done {
+        tokio::task::yield_now().await;
+        shutdown.try_advance().await;
+    }
 }
 
 pub struct AutosaveService;
