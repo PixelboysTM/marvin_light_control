@@ -3261,6 +3261,7 @@ dependencies = [
  "mlc_ofl",
  "ratatui",
  "serde",
+ "serde_json",
  "textwrap",
  "tokio",
  "tracing",

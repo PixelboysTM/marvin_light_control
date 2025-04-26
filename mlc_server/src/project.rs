@@ -13,6 +13,7 @@ use mlc_communication::services::project::{
 use mlc_communication::services::project_selection::{
     ProjectIdent, ProjectSelectionService, ProjectSelectionServiceError,
 };
+use mlc_data::endpoints::{EndpointConfig, EndpointMapping};
 use mlc_data::misc::ErrIgnore;
 use mlc_data::project::universe::{
     FixtureAddress, FixtureUniverse, UniverseAddress, UniverseId, UniverseSlot, UNIVERSE_SIZE,
@@ -40,6 +41,7 @@ pub struct Project {
     pub blueprints: Vec<FixtureBlueprint>,
     pub settings: ProjectSettings,
     pub universes: Vec<FixtureUniverse>,
+    pub endpoint_mapping: EndpointMapping,
 }
 
 #[rtc::async_trait]
@@ -393,6 +395,9 @@ impl Project {
                 addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
                 fixtures: HashMap::new(),
             }],
+            endpoint_mapping: EndpointMapping {
+                endpoints: HashMap::from([(1 as UniverseId, vec![EndpointConfig::Logger])]),
+            },
         }
     }
 }

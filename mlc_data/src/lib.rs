@@ -12,6 +12,7 @@ pub mod bounded;
 pub mod fixture;
 pub mod misc;
 pub mod project;
+pub mod endpoints;
 
 pub type D3Vec<T> = Vec<Vec<Vec<T>>>;
 

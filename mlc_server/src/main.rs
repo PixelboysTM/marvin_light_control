@@ -1,12 +1,12 @@
 use crate::global_services::{AutosaveService, ShutdownService};
 use crate::logging::setup_logging;
-use crate::misc::{ShutdownHandler, ShutdownPhase};
+use crate::misc::ShutdownHandler;
 use crate::project::create_default_project;
 use crate::server::ServerService;
 use crate::tui::TuiService;
 use crate::universe::UniverseRuntimeService;
-use log::{error, info};
-use misc::{AdaptNotifier, AdaptScopes};
+use log::error;
+use misc::AdaptNotifier;
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
 use mlc_communication::services::general::Info;
@@ -16,12 +16,11 @@ use mlc_communication::{self as com, remoc::prelude::*};
 use mlc_data::misc::ErrIgnore;
 use mlc_ofl::OflLibrary;
 use project::{get_base_app_dir, Project};
-use std::pin::Pin;
 use std::sync::Arc;
-use tokio::select;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use universe::{UniverseRuntime, UniverseRuntimeController};
+use universe::UniverseRuntimeController;
+use crate::endpoints::EndpointsManagerService;
 
 mod global_services;
 mod logging;
@@ -30,6 +29,7 @@ mod project;
 mod server;
 mod tui;
 mod universe;
+mod endpoints;
 
 const DEFAULT_SERVER_PORT: u16 = 8181;
 
@@ -180,12 +180,6 @@ async fn main() {
     let lib_path = get_base_app_dir().join("library");
     tokio::fs::create_dir_all(&lib_path).await.ignore();
 
-    // let (universe_runtime_join, universe_runtime) = UniverseRuntime::start(
-    //     shutdown_handler.clone(),
-    //     adapt_notifier.clone(),
-    //     project.clone(),
-    // );
-
     let (universe_runtime_service, universe_runtime_controller) = UniverseRuntimeService::create();
 
     let service_obj = Arc::new(ServiceImpl {
@@ -207,6 +201,7 @@ async fn main() {
     service_handler.add_service(ServerService);
     service_handler.add_service(ShutdownService);
     service_handler.add_service(AutosaveService);
+    service_handler.add_service(EndpointsManagerService);
 
     service_handler.add_complex_service(TuiService, log_rx);
 
