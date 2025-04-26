@@ -18,12 +18,19 @@ use std::{io, sync::Arc, time::Duration};
 use textwrap::{wrap, Options};
 use tokio::sync::RwLock;
 
-use crate::misc::ShutdownHandler;
-use crate::AServiceImpl;
+use crate::misc::{ShutdownHandler, ShutdownPhase};
+use crate::{AServiceImpl, MlcService, MlcServiceResources};
 
-pub async fn create_tui(
+pub struct TuiService;
+
+impl MlcService<std::sync::mpsc::Receiver<Vec<u8>>> for TuiService {
+    fn start(res: &MlcServiceResources, input: std::sync::mpsc::Receiver<Vec<u8>>) -> (impl Future<Output=()> + Send + 'static, ()) {
+        (create_tui(res.shutdown.clone(), res.service_obj.clone(), input), ())
+    }
+}
+
+async fn create_tui(
     shutdown_handler: ShutdownHandler,
-    exit_flag: Arc<RwLock<bool>>,
     service_obj: AServiceImpl,
     log_rx: std::sync::mpsc::Receiver<Vec<u8>>,
 ) {
@@ -31,7 +38,6 @@ pub async fn create_tui(
     let mut terminal = ratatui::init();
     let app_result = TuiApp {
         shutdown_handler,
-        exit_flag,
         service_obj,
         tui_state: TuiAppState {
             exit: ExitState::Idle,
@@ -53,7 +59,6 @@ pub async fn create_tui(
 
 pub struct TuiApp {
     shutdown_handler: ShutdownHandler,
-    exit_flag: Arc<RwLock<bool>>,
     service_obj: AServiceImpl,
     tui_state: TuiAppState,
 }
@@ -155,7 +160,7 @@ pub fn calculate_wrapped_paragraph_height(
 impl TuiApp {
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !matches!(self.tui_state.exit, ExitState::Quit) {
-            if *self.exit_flag.read().await {
+            if self.shutdown_handler.current() > ShutdownPhase::Phase2 {
                 self.tui_state.exit = ExitState::Quit;
             }
 

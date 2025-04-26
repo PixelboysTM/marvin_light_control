@@ -83,12 +83,10 @@ impl ProjectService for ServiceImpl {
             .collect::<Vec<_>>();
 
         if blueprints.len() != identifiers.len() {
-            self.info
-                .send(Info::Warning {
-                    title: "Blueprints not found".to_string(),
-                    msg: "Not all specified blueprints could be found".to_string(),
-                })
-                .ignore();
+            self.send_info(Info::Warning {
+                title: "Blueprints not found".to_string(),
+                msg: "Not all specified blueprints could be found".to_string(),
+            });
         }
         let mut p = self.project.write().await;
 
@@ -98,9 +96,7 @@ impl ProjectService for ServiceImpl {
         p.blueprints
             .sort_by(|b1, b2| b1.meta.identifier.cmp(&b2.meta.identifier));
 
-        self.info
-            .send(ProjectInfo::BlueprintsChanged.into())
-            .ignore();
+        self.send_info(ProjectInfo::BlueprintsChanged.into());
 
         Ok(())
     }
@@ -184,9 +180,7 @@ impl ProjectService for ServiceImpl {
         let mut p = self.validate_project_mut().await?;
         p.settings = settings;
         self.adapt_notifier.notify(AdaptScopes::SETTINGS);
-        self.info
-            .send(ProjectInfo::SettingsChanged.into())
-            .debug_ignore();
+        self.send_info(ProjectInfo::SettingsChanged.into());
         Ok(())
     }
 

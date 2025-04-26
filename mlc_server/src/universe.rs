@@ -15,8 +15,9 @@ use tokio::{
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::{
-    misc::{AdaptNotifier, AdaptScopes},
-    project::Project,
+    misc::{AdaptNotifier, AdaptScopes}, project::Project,
+    MlcService,
+    MlcServiceResources,
 };
 
 #[derive(Debug)]
@@ -115,7 +116,10 @@ impl UniverseRuntime {
         shutdown: ShutdownHandler,
         adapt_notifier: AdaptNotifier,
         project: Arc<RwLock<Project>>,
-    ) -> (JoinHandle<()>, UniverseRuntimeController) {
+    ) -> (
+        impl Future<Output = ()> + 'static,
+        UniverseRuntimeController,
+    ) {
         let (update_tx, _update_rx) = tokio::sync::broadcast::channel(32);
         let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -137,25 +141,23 @@ impl UniverseRuntime {
         )
     }
 
-    fn spawn(mut self, shutdown: ShutdownHandler, adapt_notifier: AdaptNotifier) -> JoinHandle<()> {
-        tokio::spawn(async move {
-            log::info!("Starting Universe Runtime");
-            loop {
-                select! {
-                    _ = shutdown.wait(ShutdownPhase::Phase1) => {
-                        log::info!("Shutting down Universe Runtime!");
-                        break;
-                    }
-                    _ = adapt_notifier.wait(AdaptScopes::UNIVERSES) => {
-                        self.adapt().await;
-                    }
-                    Some(cmd) = self.cmd_recv.recv() => {
-                        self.handle_cmd(cmd).await;
-                    }
+    async fn spawn(mut self, shutdown: ShutdownHandler, adapt_notifier: AdaptNotifier) {
+        log::info!("Starting Universe Runtime");
+        loop {
+            select! {
+                _ = shutdown.wait(ShutdownPhase::Phase1) => {
+                    log::info!("Shutting down Universe Runtime!");
+                    break;
+                }
+                _ = adapt_notifier.wait(AdaptScopes::UNIVERSES) => {
+                    self.adapt().await;
+                }
+                Some(cmd) = self.cmd_recv.recv() => {
+                    self.handle_cmd(cmd).await;
                 }
             }
-            log::info!("Exiting Universe Runtime");
-        })
+        }
+        log::info!("Exiting Universe Runtime");
     }
 
     #[tracing::instrument]

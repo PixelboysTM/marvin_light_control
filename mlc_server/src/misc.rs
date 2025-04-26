@@ -60,7 +60,7 @@ bitflags! {
 #[derive(Debug, Clone)]
 pub struct ShutdownHandler {
     notifier: Arc<watch::Sender<ShutdownPhase>>,
-    _waiter: Arc<watch::Receiver<ShutdownPhase>>,
+    _waiter: Arc<watch::Receiver<ShutdownPhase>>, //Todo save how many shutdowns are waiting for a set phase
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -69,7 +69,7 @@ pub enum ShutdownPhase {
     None = 0,
     /// Everything non-critical shutting down
     Phase1 = 1,
-    /// Everything critical shutting down mainly the server
+    /// Everything critical shutting down, mainly the server
     Phase2 = 2,
     /// Shutdown should be complete
     Done = 3,
@@ -93,9 +93,12 @@ impl ShutdownHandler {
             ShutdownPhase::Done => ShutdownPhase::Done,
         };
         self.notifier.send(next).debug_ignore();
-        // async {
+
         tokio::task::yield_now()
-        // }
+    }
+
+    pub fn current(&self) -> ShutdownPhase {
+        *self.notifier.borrow()
     }
 
     pub fn wait(&self, phase: ShutdownPhase) -> impl Future<Output = ()> {

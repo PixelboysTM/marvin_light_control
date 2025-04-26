@@ -1,6 +1,10 @@
+use crate::global_services::{AutosaveService, ShutdownService};
+use crate::logging::setup_logging;
 use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::project::create_default_project;
-use log::{debug, error, info, trace, warn};
+use crate::server::ServerService;
+use crate::tui::TuiService;
+use log::{error, info};
 use misc::{AdaptNotifier, AdaptScopes};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
 use mlc_communication::remoc::rtc::CallError;
@@ -9,26 +13,17 @@ use mlc_communication::services::general::{Alive, View};
 use mlc_communication::services::project::ProjectServiceError;
 use mlc_communication::{self as com, remoc::prelude::*};
 use mlc_data::misc::ErrIgnore;
-use mlc_data::DynamicResult;
 use mlc_ofl::OflLibrary;
 use project::{get_base_app_dir, Project};
-use server::setup_server;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::level_filters::LevelFilter;
-use tracing::Level;
-use tracing_log::LogTracer;
-use tracing_subscriber::fmt::format::{FmtSpan, Writer};
-use tracing_subscriber::fmt::time::FormatTime;
-use tracing_subscriber::fmt::{layer, MakeWriter};
-use tui::create_tui;
 use universe::{UniverseRuntime, UniverseRuntimeController};
 
+mod global_services;
+mod logging;
 mod misc;
 mod project;
 mod server;
@@ -84,20 +79,90 @@ impl com::services::general::GeneralService for ServiceImpl {
             Err(_e) => return Ok(false),
         };
         if let Err(e) = p.save().await.map_err(ProjectServiceError::SavingFailed) {
-            self.info
-                .send(Info::Warning {
-                    title: "Failed to save".to_string(),
-                    msg: e.to_string(),
-                })
-                .ignore();
+            self.send_info(Info::Warning {
+                title: "Failed to save".to_string(),
+                msg: e.to_string(),
+            });
         }
 
-        self.info.send(Info::Saved).ignore();
+        self.send_info(Info::Saved);
         self.status
             .send(format!("Saved Project '{}' to disk!", p.metadata.name))
             .ignore();
 
         Ok(true)
+    }
+}
+
+pub struct MlcServiceResources {
+    service_obj: AServiceImpl,
+    shutdown: ShutdownHandler,
+    adapt_notifier: AdaptNotifier,
+}
+
+pub struct MlcServiceResourcesBuilder {
+    resources: MlcServiceResources,
+    handles: Vec<JoinHandle<()>>,
+}
+
+impl MlcServiceResourcesBuilder {
+    pub fn new(
+        service_obj: AServiceImpl,
+        shutdown_handler: ShutdownHandler,
+        adapt_notifier: AdaptNotifier,
+    ) -> Self {
+        Self {
+            resources: MlcServiceResources {
+                service_obj,
+                adapt_notifier,
+                shutdown: shutdown_handler,
+            },
+            handles: vec![],
+        }
+    }
+
+    pub fn add_service<S: MlcService<(), ()>>(&mut self, _service: S) {
+        self.add_complex_service(_service, ());
+    }
+
+    pub fn add_complex_service<S: MlcService<I, O>, I, O>(&mut self, _service: S, input: I) -> O {
+        let (handle, out) = S::start(&self.resources, input);
+        self.handles.spawn(handle);
+        out
+    }
+
+    pub fn add_service_handle(&mut self, handle: JoinHandle<()>) {
+        self.handles.push(handle);
+    }
+
+    pub fn addd_dynamic<F: Future<Output = ()> + Send + 'static>(&mut self, fut: F) {
+        self.handles.spawn(fut);
+    }
+
+    pub async fn wait(self) {
+        for handle in self.handles {
+            handle.await.unwrap()
+        }
+    }
+}
+
+pub trait MlcService<I = (), O = ()> {
+    fn start(
+        resources: &MlcServiceResources,
+        i: I,
+    ) -> (impl Future<Output = ()> + Send + 'static, O);
+}
+
+pub trait MlcServiceSimple {
+    fn start(resources: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static;
+}
+
+impl<S: MlcServiceSimple> MlcService for S {
+    fn start(
+        resources: &MlcServiceResources,
+        i: (),
+    ) -> (impl Future<Output = ()> + Send + 'static, ()) {
+        (S::start(resources), ())
     }
 }
 
@@ -129,164 +194,28 @@ async fn main() {
         shutdown: shutdown_handler.clone(),
     });
 
-    let mut task_handles = vec![];
+    // let mut task_handles = vec![];
+    let mut service_handler =
+        MlcServiceResourcesBuilder::new(service_obj, shutdown_handler, adapt_notifier);
 
-    task_handles.push(universe_runtime_join);
+    service_handler.addd_dynamic(universe_runtime_join);
 
-    task_handles.spawn(setup_server(
-        DEFAULT_SERVER_PORT,
-        service_obj.clone(),
-        shutdown_handler.clone(),
-    ));
-    task_handles.spawn(create_shutdown_handler(
-        service_obj.clone(),
-        shutdown_handler.clone(),
-    ));
-    task_handles.spawn(autosave_service(
-        service_obj.clone(),
-        adapt_notifier.clone(),
-        shutdown_handler.clone(),
-    ));
+    service_handler.add_service(ServerService);
+    service_handler.add_service(ShutdownService);
+    service_handler.add_service(AutosaveService);
 
-    let should_tui_exit = Arc::new(RwLock::new(false));
-    let tui_handle = tokio::spawn(create_tui(
-        shutdown_handler.clone(),
-        should_tui_exit.clone(),
-        service_obj.clone(),
-        log_rx,
-    ));
+    service_handler.add_complex_service(TuiService, log_rx);
 
-    trace!("This is a trace");
-    debug!("This is a debug");
-    info!("This is a info");
-    warn!("This is a warning");
-    error!("This is a error");
+    // let tui_handle = tokio::spawn(create_tui(
+    //     shutdown_handler.clone(),
+    //     should_tui_exit.clone(),
+    //     service_obj.clone(),
+    //     log_rx,
+    // ));
 
-    for handle in task_handles {
-        handle.await.unwrap();
-    }
+    service_handler.wait().await;
 
-    info!("Aquire tui exit");
-    *should_tui_exit.write().await = true;
-
-    tui_handle.await.unwrap();
-}
-
-async fn create_shutdown_handler(obj: AServiceImpl, shutdown: ShutdownHandler) {
-    shutdown.wait(ShutdownPhase::Phase1).await;
-    obj.send_info(Info::Shutdown);
-
-    let mut p = obj.project.write().await;
-    if obj.project_valid().await && p.settings.save_on_quit {
-        p.save().await.unwrap();
-    }
-
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    shutdown.advance().await;
-    shutdown.advance().await;
-}
-
-fn setup_logging() -> DynamicResult<std::sync::mpsc::Receiver<Vec<u8>>> {
-    use tracing_subscriber::prelude::*;
-
-    let (w, rx) = FuturesWriter::new();
-
-    let debug = {
-        #[cfg(not(debug_assertions))]
-        let d = false;
-
-        #[cfg(debug_assertions)]
-        let d = true;
-
-        d
-    };
-
-    let sub = tracing_subscriber::Registry::default()
-        .with(
-            layer()
-                .compact()
-                .with_ansi(false)
-                .with_writer(
-                    OpenOptions::new()
-                        .append(true)
-                        .create(true)
-                        .open("server.log")?,
-                )
-                .with_filter(LevelFilter::from_level(Level::WARN)),
-        )
-        .with(
-            layer()
-                .with_ansi(false)
-                .with_writer(
-                    OpenOptions::new()
-                        .write(true)
-                        .create(true)
-                        .truncate(true)
-                        .open("server-verbose.log")?,
-                )
-                .with_span_events(FmtSpan::FULL)
-                .with_filter(LevelFilter::TRACE),
-        )
-        .with(
-            layer()
-                .compact()
-                .with_writer(w)
-                .with_timer(NiceTime)
-                .with_ansi(true)
-                // .with_target(true)
-                .with_file(debug)
-                .with_line_number(debug)
-                .with_target(false)
-                .with_filter(LevelFilter::INFO),
-        );
-
-    tracing::subscriber::set_global_default(sub)?;
-
-    LogTracer::init()?;
-    Ok(rx)
-}
-
-pub struct NiceTime;
-
-impl FormatTime for NiceTime {
-    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
-        write!(w, "{}", chrono::Local::now().format("[%H:%M.%S]"))
-    }
-}
-
-struct FuturesWriter {
-    sink: std::sync::mpsc::Sender<Vec<u8>>,
-}
-
-impl FuturesWriter {
-    fn new() -> (Self, std::sync::mpsc::Receiver<Vec<u8>>) {
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        (Self { sink: tx }, rx)
-    }
-}
-
-impl Write for FuturesWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.sink
-            .send(buf.to_vec())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> MakeWriter<'a> for FuturesWriter {
-    type Writer = Self;
-
-    fn make_writer(&'a self) -> Self::Writer {
-        Self {
-            sink: self.sink.clone(),
-        }
-    }
+    // tui_handle.await.unwrap();
 }
 
 pub trait SpawnExt<S> {
@@ -300,47 +229,5 @@ where
 {
     fn spawn(&mut self, s: F) {
         self.push(tokio::spawn(s));
-    }
-}
-
-async fn autosave_service(
-    service_obj: AServiceImpl,
-    adapt_notifier: AdaptNotifier,
-    shutdown: ShutdownHandler,
-) {
-    fn save_fut(p: &Project, valid: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
-        if valid {
-            if let Some(d) = &p.settings.autosave {
-                Box::pin(tokio::time::sleep(*d))
-            } else {
-                Box::pin(futures::future::pending())
-            }
-        } else {
-            Box::pin(futures::future::pending())
-        }
-    }
-
-    loop {
-        let duration = save_fut(
-            &*service_obj.project.read().await,
-            *service_obj.valid_project.read().await,
-        );
-
-        select! {
-            _ = adapt_notifier.wait(AdaptScopes::SETTINGS) => {
-                info!("Adapting autosave interval!");
-                continue;
-            }
-            _ = shutdown.wait(ShutdownPhase::Phase1) => {
-                break;
-            }
-            _ = duration => {
-                info!("Autosave triggered!");
-                let _ = service_obj.project.write().await.save().await.map_err(|e| error!("{e:?}"));
-                service_obj.send_info(Info::Autosaved);
-            }
-        }
-
-        tokio::task::yield_now().await;
     }
 }

@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::AServiceImpl;
+use crate::{AServiceImpl, MlcService, MlcServiceResources, MlcServiceSimple, DEFAULT_SERVER_PORT};
 use log::error;
 use mlc_communication::services::general::GeneralServiceIdent;
 use mlc_communication::services::project::ProjectServiceIdent;
@@ -11,7 +11,19 @@ use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::select;
 
-pub async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHandler) {
+pub struct ServerService;
+
+impl MlcServiceSimple for ServerService {
+    fn start(res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
+        setup_server(
+            DEFAULT_SERVER_PORT,
+            res.service_obj.clone(),
+            res.shutdown.clone(),
+        )
+    }
+}
+
+async fn setup_server(port: u16, service_obj: AServiceImpl, shutdown: ShutdownHandler) {
     log::info!("Starting Server...");
 
     log::info!("Listening on port {}", port);

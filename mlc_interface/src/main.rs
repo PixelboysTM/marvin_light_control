@@ -215,7 +215,7 @@ fn ProjectLayout() -> Element {
                         }
                         Info::Shutdown => {
                             error!("Got shut down");
-                            ToastInfo::info("Shutdown", "The backend shutdown!s").post();
+                            ToastInfo::info("Shutdown", "The backend shutdowns!").post();
                             navigate(Screen::Connect);
                             break;
                         }
