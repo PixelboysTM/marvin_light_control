@@ -37,7 +37,7 @@ impl AdaptNotifier {
                         scs = sc;
                         break;
                     } else {
-                        log::info!("Adapt recvieved but didn't matched listened scopes")
+                        log::info!("Adapt received but didn't matched listened scopes")
                     }
                 }
             }
@@ -87,8 +87,15 @@ impl ShutdownHandler {
             waiters: Arc::new(RwLock::new([0; 4])),
         }
     }
+    
+    pub fn shutdown(&self) {
+        if self.current() == ShutdownPhase::None { 
+            tokio::task::spawn(self.advance());
+        }
+        info!("Already shutting down");
+    }
 
-    pub fn advance(&self) -> impl Future<Output = ()> + 'static {
+    fn advance(&self) -> impl Future<Output = ()> + 'static {
         let next = match self.current() {
             ShutdownPhase::None => ShutdownPhase::Phase1,
             ShutdownPhase::Phase1 => ShutdownPhase::Phase2,
@@ -103,7 +110,10 @@ impl ShutdownHandler {
     pub fn try_advance(&self) -> impl Future<Output = bool> + 'static {
         let can = {
             let w = self.waiters.read().expect("Waiter lock");
-            w[self.current() as usize] == 0
+            let c = self.current();
+            let v = w[c as usize];
+            info!("Waiters: {:?} in Phase {:?}", v, c);
+            v == 0
         };
 
         let fut = self.advance();
@@ -124,7 +134,7 @@ impl ShutdownHandler {
         let mut rx = self.notifier.subscribe();
 
         async move {
-            let _d = Waiter::new(phase, self.waiters.clone());
+            let _d = ShutdownWaiterTracker::new(phase, self.waiters.clone());
             loop {
                 if let Ok(()) = rx.changed().await {
                     let sp = *rx.borrow_and_update();
@@ -137,12 +147,12 @@ impl ShutdownHandler {
     }
 }
 
-struct Waiter {
+struct ShutdownWaiterTracker {
     phase: ShutdownPhase,
     waiters: Arc<RwLock<[u16; 4]>>,
 }
 
-impl Waiter {
+impl ShutdownWaiterTracker {
     fn new(phase: ShutdownPhase, waiters: Arc<RwLock<[u16; 4]>>) -> Self {
         {
             let mut w = waiters.write().expect("Waiter lock");
@@ -152,7 +162,7 @@ impl Waiter {
     }
 }
 
-impl Drop for Waiter {
+impl Drop for ShutdownWaiterTracker {
     fn drop(&mut self) {
         let mut w = self.waiters.write().expect("Waiter lock");
         w[self.phase as usize] -= 1;

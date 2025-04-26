@@ -24,8 +24,15 @@ use crate::{AServiceImpl, MlcService, MlcServiceResources};
 pub struct TuiService;
 
 impl MlcService<std::sync::mpsc::Receiver<Vec<u8>>> for TuiService {
-    fn start(self, res: &MlcServiceResources, input: std::sync::mpsc::Receiver<Vec<u8>>) -> (impl Future<Output=()> + Send + 'static, ()) {
-        (create_tui(res.shutdown.clone(), res.service_obj.clone(), input), ())
+    fn start(
+        self,
+        res: &MlcServiceResources,
+        input: std::sync::mpsc::Receiver<Vec<u8>>,
+    ) -> (impl Future<Output = ()> + Send + 'static, ()) {
+        (
+            create_tui(res.shutdown.clone(), res.service_obj.clone(), input),
+            (),
+        )
     }
 }
 
@@ -213,7 +220,7 @@ impl TuiApp {
                 self.tui_state.exit = match self.tui_state.exit {
                     ExitState::Idle => ExitState::UserConfirm,
                     ExitState::UserConfirm => {
-                        tokio::task::spawn(self.shutdown_handler.advance());
+                        self.shutdown_handler.shutdown();
                         ExitState::Exiting
                     }
                     ExitState::Exiting => ExitState::Quit,
@@ -221,7 +228,7 @@ impl TuiApp {
                 }
             }
             KeyCode::Char('y') if self.tui_state.exit == ExitState::UserConfirm => {
-                tokio::task::spawn(self.shutdown_handler.advance());
+                self.shutdown_handler.shutdown();
                 self.tui_state.exit = ExitState::Exiting;
             }
             KeyCode::Char('n') if self.tui_state.exit == ExitState::UserConfirm => {
@@ -284,7 +291,7 @@ impl StatefulWidget for MainWidget {
         let meta_block = Block::bordered().title("Meta").border_set(border::ROUNDED);
 
         match &state.meta_information {
-            Some(_meta) => Paragraph::new("MetaInformmation tui not implemented")
+            Some(_meta) => Paragraph::new("MetaInformation tui not implemented")
                 .block(meta_block)
                 .render(layout[0], buf),
             None => Paragraph::new("No Project is currently loaded")
@@ -305,7 +312,7 @@ impl StatefulWidget for MainWidget {
             let area = popup_area(area, 30, 20);
             Clear.render(area, buf);
             Paragraph::new(
-                "Are u sure you want to quit Marvin Light Control?"
+                "Are you sure you want to quit Marvin Light Control?"
                     .to_line()
                     .centered(),
             )
