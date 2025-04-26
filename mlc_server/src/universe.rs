@@ -14,11 +14,43 @@ use tokio::{
 };
 
 use crate::misc::{ShutdownHandler, ShutdownPhase};
-use crate::{
-    misc::{AdaptNotifier, AdaptScopes}, project::Project,
-    MlcService,
-    MlcServiceResources,
-};
+use crate::{misc::{AdaptNotifier, AdaptScopes}, project::Project, MlcService, MlcServiceResources, MlcServiceSimple};
+
+pub struct UniverseRuntimeService {
+    update_notifier: Sender<UniverseUpdate>,
+    cmd_recv: tokio::sync::mpsc::UnboundedReceiver<RuntimeCommand>,
+}
+
+impl UniverseRuntimeService {
+    pub fn create() -> (Self, UniverseRuntimeController) {
+        let (update_tx, _update_rx) = tokio::sync::broadcast::channel(32);
+        let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        (
+            Self {
+                update_notifier: update_tx.clone(),
+                cmd_recv: cmd_rx,
+            },
+            UniverseRuntimeController {
+                update_subscriber: update_tx,
+                cmd_sender: cmd_tx,
+            },
+        )
+    }
+}
+
+impl MlcServiceSimple for UniverseRuntimeService {
+    fn start(self, res: &MlcServiceResources) -> impl Future<Output=()> + Send + 'static {
+        let runtime = UniverseRuntime {
+            cmd_recv: self.cmd_recv,
+            update_notifier: self.update_notifier,
+            runtime_universes: vec![],
+            project: res.service_obj.project.clone(),
+        };
+        
+        runtime.spawn(res.shutdown.clone(), res.adapt_notifier.clone())
+    }
+}
 
 #[derive(Debug)]
 pub struct UniverseRuntime {

@@ -4,6 +4,7 @@ use crate::misc::{ShutdownHandler, ShutdownPhase};
 use crate::project::create_default_project;
 use crate::server::ServerService;
 use crate::tui::TuiService;
+use crate::universe::UniverseRuntimeService;
 use log::{error, info};
 use misc::{AdaptNotifier, AdaptScopes};
 use mlc_communication::remoc::rch::watch::{Receiver, Sender};
@@ -121,12 +122,12 @@ impl MlcServiceResourcesBuilder {
         }
     }
 
-    pub fn add_service<S: MlcService<(), ()>>(&mut self, _service: S) {
-        self.add_complex_service(_service, ());
+    pub fn add_service<S: MlcService<(), ()>>(&mut self, service: S) {
+        self.add_complex_service(service, ());
     }
 
-    pub fn add_complex_service<S: MlcService<I, O>, I, O>(&mut self, _service: S, input: I) -> O {
-        let (handle, out) = S::start(&self.resources, input);
+    pub fn add_complex_service<S: MlcService<I, O>, I, O>(&mut self, service: S, input: I) -> O {
+        let (handle, out) = service.start(&self.resources, input);
         self.handles.spawn(handle);
         out
     }
@@ -148,21 +149,23 @@ impl MlcServiceResourcesBuilder {
 
 pub trait MlcService<I = (), O = ()> {
     fn start(
+        self,
         resources: &MlcServiceResources,
         i: I,
     ) -> (impl Future<Output = ()> + Send + 'static, O);
 }
 
 pub trait MlcServiceSimple {
-    fn start(resources: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static;
+    fn start(self, resources: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static;
 }
 
 impl<S: MlcServiceSimple> MlcService for S {
     fn start(
+        self,
         resources: &MlcServiceResources,
-        i: (),
+        _: (),
     ) -> (impl Future<Output = ()> + Send + 'static, ()) {
-        (S::start(resources), ())
+        (<S as MlcServiceSimple>::start(self, resources), ())
     }
 }
 
@@ -177,11 +180,13 @@ async fn main() {
     let lib_path = get_base_app_dir().join("library");
     tokio::fs::create_dir_all(&lib_path).await.ignore();
 
-    let (universe_runtime_join, universe_runtime) = UniverseRuntime::start(
-        shutdown_handler.clone(),
-        adapt_notifier.clone(),
-        project.clone(),
-    );
+    // let (universe_runtime_join, universe_runtime) = UniverseRuntime::start(
+    //     shutdown_handler.clone(),
+    //     adapt_notifier.clone(),
+    //     project.clone(),
+    // );
+
+    let (universe_runtime_service, universe_runtime_controller) = UniverseRuntimeService::create();
 
     let service_obj = Arc::new(ServiceImpl {
         project,
@@ -190,15 +195,14 @@ async fn main() {
         status: rch::watch::channel(String::new()).0,
         adapt_notifier: adapt_notifier.clone(),
         ofl_library: OflLibrary::create(lib_path.join("ofl.json")),
-        universe_runtime: Arc::new(universe_runtime),
+        universe_runtime: Arc::new(universe_runtime_controller),
         shutdown: shutdown_handler.clone(),
     });
 
-    // let mut task_handles = vec![];
     let mut service_handler =
         MlcServiceResourcesBuilder::new(service_obj, shutdown_handler, adapt_notifier);
 
-    service_handler.addd_dynamic(universe_runtime_join);
+    service_handler.add_service(universe_runtime_service);
 
     service_handler.add_service(ServerService);
     service_handler.add_service(ShutdownService);
@@ -206,16 +210,7 @@ async fn main() {
 
     service_handler.add_complex_service(TuiService, log_rx);
 
-    // let tui_handle = tokio::spawn(create_tui(
-    //     shutdown_handler.clone(),
-    //     should_tui_exit.clone(),
-    //     service_obj.clone(),
-    //     log_rx,
-    // ));
-
     service_handler.wait().await;
-
-    // tui_handle.await.unwrap();
 }
 
 pub trait SpawnExt<S> {

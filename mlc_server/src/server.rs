@@ -14,7 +14,7 @@ use tokio::select;
 pub struct ServerService;
 
 impl MlcServiceSimple for ServerService {
-    fn start(res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
+    fn start(self, res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
         setup_server(
             DEFAULT_SERVER_PORT,
             res.service_obj.clone(),

@@ -9,7 +9,7 @@ use tracing::{error, info};
 pub struct ShutdownService;
 
 impl MlcServiceSimple for ShutdownService {
-    fn start(res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
+    fn start(self, res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
         create_shutdown_handler(res.service_obj.clone(), res.shutdown.clone())
     }
 }
@@ -31,7 +31,7 @@ async fn create_shutdown_handler(obj: AServiceImpl, shutdown: ShutdownHandler) {
 pub struct AutosaveService;
 
 impl MlcServiceSimple for AutosaveService {
-    fn start(res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
+    fn start(self, res: &MlcServiceResources) -> impl Future<Output = ()> + Send + 'static {
         autosave_service(
             res.service_obj.clone(),
             res.adapt_notifier.clone(),

@@ -24,7 +24,7 @@ use crate::{AServiceImpl, MlcService, MlcServiceResources};
 pub struct TuiService;
 
 impl MlcService<std::sync::mpsc::Receiver<Vec<u8>>> for TuiService {
-    fn start(res: &MlcServiceResources, input: std::sync::mpsc::Receiver<Vec<u8>>) -> (impl Future<Output=()> + Send + 'static, ()) {
+    fn start(self, res: &MlcServiceResources, input: std::sync::mpsc::Receiver<Vec<u8>>) -> (impl Future<Output=()> + Send + 'static, ()) {
         (create_tui(res.shutdown.clone(), res.service_obj.clone(), input), ())
     }
 }
