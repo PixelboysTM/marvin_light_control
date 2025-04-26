@@ -174,6 +174,26 @@ impl ProjectService for ServiceImpl {
 
         Ok((rx_1, tx_2))
     }
+
+    async fn get_settings(&self) -> Result<ProjectSettings, ProjectServiceError> {
+        let p = self.validate_project().await?;
+        Ok(p.settings.clone())
+    }
+
+    async fn update_settings(&self, settings: ProjectSettings) -> Result<(), ProjectServiceError> {
+        let mut p = self.validate_project_mut().await?;
+        p.settings = settings;
+        self.adapt_notifier.notify(AdaptScopes::SETTINGS);
+        self.info
+            .send(ProjectInfo::SettingsChanged.into())
+            .debug_ignore();
+        Ok(())
+    }
+
+    async fn get_meta(&self) -> Result<ProjectMetadata, ProjectServiceError> {
+        let p = self.validate_project().await?;
+        Ok(p.metadata.clone())
+    }
 }
 
 impl ServiceImpl {

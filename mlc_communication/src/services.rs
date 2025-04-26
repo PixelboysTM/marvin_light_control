@@ -2,6 +2,7 @@ pub mod general {
     use crate::{Com, Serde, ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use macro_rules_attribute::derive;
 
+    use remoc::rtc::{Deserialize, Serialize};
     use remoc::{rch::watch, rtc};
 
     pub struct GeneralServiceIdent;
@@ -16,16 +17,16 @@ pub mod general {
         type S = GeneralServiceServerShared<T>;
     }
 
-    #[derive(Com!)]
+    #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
     pub struct Alive;
 
-    #[derive(Com!)]
+    #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
     pub enum View {
         Project,
         Edit,
     }
 
-    #[derive(Com!)]
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
     pub enum Info {
         Idle,
         Shutdown,
@@ -35,10 +36,11 @@ pub mod general {
         ProjectInfo { info: ProjectInfo },
     }
 
-    #[derive(Com!)]
+    #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
     pub enum ProjectInfo {
         BlueprintsChanged,
         UniverseListChanged,
+        SettingsChanged,
     }
 
     impl From<ProjectInfo> for Info {
@@ -90,16 +92,16 @@ pub mod project_selection {
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
     pub enum ProjectSelectionServiceError {
-        #[error("Failed to list all projects: {0:?}")]
+        #[error("Failed to list all projects: {0: }")]
         ProjectListError(String),
 
-        #[error("Failed to create project: {0:?}")]
+        #[error("Failed to create the project: {0: }")]
         ProjectCreateError(String),
 
-        #[error("Failed to open project: {0:?}")]
+        #[error("Failed to open project: {0: }")]
         ProjectOpenError(String),
 
-        #[error("Failed to delete project: {0:?}")]
+        #[error("Failed to delete the project: {0: }")]
         ProjectDeleteError(String),
 
         #[error("Network communication error: {0:?}")]
@@ -111,6 +113,7 @@ pub mod project {
     use crate::{ServiceIdentifiable, ServiceIdentifiableServer, ServiceIdentifier};
     use mlc_data::fixture::blueprint::{FixtureBlueprint, Metadata};
     use mlc_data::project::universe::{UniverseAddress, UniverseId};
+    use mlc_data::project::{ProjectMetadata, ProjectSettings};
     use remoc::rtc;
     use serde::{Deserialize, Serialize};
 
@@ -155,6 +158,13 @@ pub mod project {
             ),
             ProjectServiceError,
         >;
+        async fn get_settings(&self) -> Result<ProjectSettings, ProjectServiceError>;
+        async fn update_settings(
+            &self,
+            settings: ProjectSettings,
+        ) -> Result<(), ProjectServiceError>;
+
+        async fn get_meta(&self) -> Result<ProjectMetadata, ProjectServiceError>;
     }
 
     #[derive(Debug, thiserror::Error, Serialize, Deserialize, Clone)]
@@ -162,10 +172,10 @@ pub mod project {
         #[error("It is no valid project loaded!")]
         InvalidProject,
 
-        #[error("Saving Project Failed: {0:?}")]
+        #[error("Saving Project Failed: {0: }")]
         SavingFailed(String),
 
-        #[error("Listing avaiable fixture blueprints failed: {0:?}")]
+        #[error("Listing available fixture blueprints failed: {0:?}")]
         BlueprintListFailed(String),
 
         #[error("Network communication error: {0:?}")]

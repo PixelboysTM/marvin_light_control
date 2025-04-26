@@ -328,6 +328,7 @@ async fn autosave_service(
 
         select! {
             _ = adapt_notifier.wait(AdaptScopes::SETTINGS) => {
+                info!("Adapting autosave interval!");
                 continue;
             }
             _ = shutdown.wait(ShutdownPhase::Phase1) => {

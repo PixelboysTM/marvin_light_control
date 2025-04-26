@@ -1,4 +1,4 @@
-use crate::screens::{BLUEPRINTS_CHANGED, UNIVERSE_LIST_CHANGED};
+use crate::screens::{BLUEPRINTS_CHANGED, SETTINGS_CHANGED, UNIVERSE_LIST_CHANGED};
 use crate::utils::{navigate, Branding, IconButton, Screen};
 use connect::{connect_url, use_service};
 use dioxus::desktop::{LogicalSize, WindowBuilder};
@@ -233,6 +233,9 @@ fn ProjectLayout() -> Element {
                             ProjectInfo::UniverseListChanged => {
                                 UNIVERSE_LIST_CHANGED.update();
                             }
+                            ProjectInfo::SettingsChanged => {
+                                SETTINGS_CHANGED.update();
+                            }
                         }
                     }
                 }
@@ -321,7 +324,7 @@ fn ProjectLayout() -> Element {
                         onclick: move |_| async move {
                             info!("Saving");
                             if let Ok(false) = gen_client.read().save().await {
-                                ToastInfo::warn("Wrong save", "Save requested, when no project was loaded!").post();
+                                ToastInfo::warn("Wrong save", "Save requested when no project was loaded!").post();
                             }
                         },
                     }

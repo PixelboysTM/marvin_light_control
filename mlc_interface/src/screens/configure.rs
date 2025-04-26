@@ -13,6 +13,8 @@ use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
 use mlc_data::fixture::blueprint::{Channel, FixtureBlueprint};
 use mlc_data::misc::ErrIgnore;
 use mlc_data::project::universe::{UniverseAddress, UniverseId, UNIVERSE_SIZE};
+use mlc_data::project::ProjectType;
+use std::time::Duration;
 use tokio::select;
 
 pub static BLUEPRINTS_CHANGED: SignalNotify = SignalNotify::create();
@@ -456,17 +458,39 @@ fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
 }
 
 const ENDPOINT_MAPPING_MODAL: Symbol = Symbol::create("endpoint-mapping");
+pub const SETTINGS_CHANGED: SignalNotify = SignalNotify::create();
 
 #[component]
 fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
+    let settings = use_resource(move || async move {
+        let _ = SETTINGS_CHANGED.read();
+        prj.read().get_settings().await
+    })
+    .rtc_suspend()?;
+
+    let meta = use_resource(move || async move { prj.read().get_meta().await }).rtc_suspend()?;
+
+    let name = meta.clone().map(|m| &m.name);
+    let file = meta.clone().map(|m| &m.file_name);
+    let format = use_memo(move || match meta.read().project_type {
+        ProjectType::Json => "JSON",
+        ProjectType::Binary => "Binary",
+        ProjectType::Invalid => "Invalid (You should not see this)",
+    });
+
+    let save_on_quit = settings.clone().map(|s| &s.save_on_quit);
+    let autosave = settings.clone().map(|s| &s.autosave);
+
+    let mem_sets = use_signal(move || settings);
+
     rsx! {
         div {
             class: "settingsContainer",
             h3 {
-                "Title:"
+                "Project Name:"
             }
             p {
-                "Test Project"
+                {name()}
             }
 
             h3 {
@@ -474,7 +498,7 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
             }
 
             code {
-                "test_project.mlc"
+                {file()}
             }
 
             h3 {
@@ -482,7 +506,7 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
             }
 
             p {
-                "Binary"
+                {format()}
             }
 
             h3 {
@@ -490,7 +514,16 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
             }
 
             input {
+                checked: save_on_quit(),
                 r#type: "checkbox",
+                onchange: move |v|  {
+                    let new_val = v.checked();
+                    let mut sett = mem_sets.read().read().clone();
+                    sett.save_on_quit = new_val;
+                    async move {
+                        prj.read().update_settings(sett).await.ignore();
+                    }
+                }
             }
 
             h3 {
@@ -498,15 +531,37 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
             }
 
             input {
+                checked: autosave().is_some(),
                 r#type: "checkbox",
+                onchange: move |v|  {
+                    let new_val = v.checked();
+                    let mut sett = mem_sets.read().read().clone();
+                    sett.autosave = if new_val {Some(Duration::from_secs(30 * 60))} else {None};
+                    async move {
+                        prj.read().update_settings(sett).await.ignore();
+                    }
+                }
             }
 
-            h3 {
-                "Interval"
-            }
+            if let Some(a) = &*autosave.read() {
+                h3 {
+                    "Interval (min)"
+                }
 
-            p {
-                "00:30"
+                input {
+                    r#type: "number",
+                    value: a.as_secs() / 60,
+                    onchange: move |v|  {
+                        let new_val = v.value().parse().map_err(|e| ToastInfo::error("S", format!("{} {e:?}", v.value())).post()).unwrap_or(42);
+                        let mut sett = mem_sets.read().read().clone();
+
+
+                        sett.autosave = Some(Duration::from_secs(new_val * 60));
+                        async move {
+                            prj.read().update_settings(sett).await.ignore();
+                        }
+                    }
+                }
             }
 
             div {
