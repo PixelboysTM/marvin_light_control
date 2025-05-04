@@ -8,7 +8,6 @@ use futures::StreamExt;
 use mlc_data::endpoints::{EndpointConfig, EndpointMapping};
 use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
-use tracing::info;
 
 mod driver_log;
 mod driver_sacn;
@@ -114,7 +113,7 @@ trait EndpointDriver<C> {
 async fn await_subs(
     subs: &mut [UniverseUpdateSubscriber],
 ) -> Option<Result<UniverseUpdate, RecvError>> {
-    info!("Waiting for universe updates");
+    // info!("Waiting for universe updates");
 
     let mut f = FuturesUnordered::new();
     for sub in subs {

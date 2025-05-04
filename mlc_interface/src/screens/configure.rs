@@ -563,16 +563,16 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
                     }
                 }
             }
+        }
 
-            div {
-                class: "buttons",
+        div {
+            class: "epm-buttons",
 
-                IconButton {
-                    icon: LdRoute,
-                    text: "Endpoint Mappings",
-                    onclick: move |_| async move {
-                        ENDPOINT_MAPPING_MODAL.open().await;
-                    }
+            IconButton {
+                icon: LdRoute,
+                text: "Endpoint Mappings",
+                onclick: move |_| async move {
+                    ENDPOINT_MAPPING_MODAL.open().await;
                 }
             }
         }

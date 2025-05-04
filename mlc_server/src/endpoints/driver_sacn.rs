@@ -59,7 +59,7 @@ async fn sacn_runner(
     let mut mapping: HashMap<u16, UniverseId> = HashMap::new();
     let mut update_intervals: HashMap<EndpointSpeed, Vec<u16>> = HashMap::new();
     let mut update_timers: HashMap<EndpointSpeed, Interval> = HashMap::new();
-    let mut cache: HashMap<UniverseId, [u8; UNIVERSE_SIZE]> = HashMap::new();
+    let mut cache: HashMap<UniverseId, [u8; UNIVERSE_SIZE + 1]> = HashMap::new();
 
     let mut dmx_source = sacn::source::SacnSource::new_v4("MLC Controller").unwrap();
     dmx_source.set_is_sending_discovery(true);
@@ -70,7 +70,7 @@ async fn sacn_runner(
                 let (sub, (speed, id)) = sub.unwrap();
                 update_intervals.entry(speed).or_default().push(id);
                 *mapping.entry(id).or_insert(0) = sub.universe();
-                cache.entry(sub.universe()).or_insert_with(|| [0; UNIVERSE_SIZE]);
+                cache.entry(sub.universe()).or_insert_with(|| [0; UNIVERSE_SIZE + 1]);
                 update_timers.entry(speed).or_insert_with(|| tokio::time::interval(speed.duration()));
                 dmx_source.register_universe(id).unwrap();
 
@@ -105,7 +105,7 @@ async fn sacn_runner(
                             }
                             UniverseUpdate::Entire{ universe, values } => {
                                 if let Some(universe) = cache.get_mut(&universe) {
-                                    *universe = *values;
+                                    universe[0..].copy_from_slice(&*values);
                                 }
                             }
                         }
@@ -120,7 +120,7 @@ async fn sacn_runner(
 }
 
 async fn await_times(subs: &mut HashMap<EndpointSpeed, Interval>) -> Option<EndpointSpeed> {
-    info!("Waiting for universe updates");
+    // info!("Waiting for universe updates");
 
     let mut f = FuturesUnordered::new();
     for (speed, interval) in subs {
