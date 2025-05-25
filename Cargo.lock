@@ -3212,6 +3212,7 @@ name = "mlc_communication"
 version = "0.0.1"
 dependencies = [
  "async-trait",
+ "bson",
  "log",
  "macro_rules_attribute",
  "mlc_data",

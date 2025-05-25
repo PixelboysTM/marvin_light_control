@@ -21,3 +21,4 @@ remoc = { version = "^0.15", default-features = false, features = [
     "codec-ciborium",
     "default-codec-ciborium",
 ] }
+bson.workspace = true
