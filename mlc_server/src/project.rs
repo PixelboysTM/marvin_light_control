@@ -173,6 +173,20 @@ impl ProjectService for ServiceImpl {
         Ok((rx_1, tx_2))
     }
 
+    async fn universe_create(&self) -> Result<UniverseId, ProjectServiceError> {
+        let mut p = self.validate_project_mut().await?;
+        p.universes.push(FixtureUniverse {
+            addresses: [UniverseSlot::Unused; UNIVERSE_SIZE],
+            fixtures: HashMap::new(),
+        });
+        self.adapt_notifier.notify(AdaptScopes::UNIVERSES);
+        self.send_info(Info::ProjectInfo {
+            info: ProjectInfo::UniverseListChanged,
+        });
+        
+        Ok(p.universes.len() as u16)
+    }
+
     async fn get_settings(&self) -> Result<ProjectSettings, ProjectServiceError> {
         let p = self.validate_project().await?;
         Ok(p.settings.clone())

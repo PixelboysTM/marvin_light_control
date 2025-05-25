@@ -279,10 +279,11 @@ impl TabItem for u16 {
 }
 
 #[component]
-pub fn Tabs<T: TabController + 'static>(
+pub fn Tabs<T: TabController + Clone + 'static>(
     controller: Signal<T>,
     orientation: Orientation,
     class: Option<String>,
+    extra: Option<Callback<(), Element>>,
 ) -> Element {
     rsx! {
         div {
@@ -299,6 +300,9 @@ pub fn Tabs<T: TabController + 'static>(
                     },
                     {option.get_name()}
                 }
+            }
+            if let Some(e) = extra {
+                {e(())}
             }
         }
     }

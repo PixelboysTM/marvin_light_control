@@ -122,6 +122,29 @@
         }
     }
 
+    .universePatcher {
+        width: 100%;
+        height: 100%;
+        padding: var(--space);
+        display: grid;
+        grid-template-rows: auto 1fr;
+
+        .tabBar {
+            /*button.add {*/
+            /*    border-radius: 1rem;*/
+            /*    height: calc(100% - 0.5rem);*/
+            /*    width: 1.5em;*/
+            /*    padding: var(--space);*/
+            /*    color: var(--c-txt);*/
+            /*    margin-left: var(--space);*/
+            /*    margin-top: auto;*/
+            /*    margin-bottom: auto;*/
+            /*    position: relative;*/
+            /*    right: var(--space);*/
+            /*}*/
+        }
+    }
+
     .panel {
         position: relative;
 

@@ -135,6 +135,8 @@ dialog.modalDialog {
         flex-direction: row;
 
         button {
+            height: auto;
+            width: 2.5em;
             border-radius: calc(var(--br) * 2) calc(var(--br) * 2) 0 0;
             margin: 0 1px 0 0;
         }
@@ -146,13 +148,14 @@ dialog.modalDialog {
         flex-direction: column;
 
         button {
+            width: auto;
+            height: 2.5em;
             border-radius: calc(var(--br) * 2) 0 0 calc(var(--br) * 2);
             margin: 0 0 1px;
         }
     }
 
     button {
-        width: auto;
         padding: 0.25rem 0.5rem;
 
         background-color: var(--c-bg);

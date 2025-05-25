@@ -5,8 +5,9 @@ use crate::utils::{
     Panel, SignalNotify, Symbol, TabController, TabItem, Tabs,
 };
 use crate::ADD_FIXTURE_MODAL;
+use dioxus::logger::tracing::{error, info};
 use dioxus::prelude::*;
-use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencil, LdPencilRuler, LdRoute, LdSearch};
+use dioxus_free_icons::icons::ld_icons::{LdLamp, LdPencil, LdPencilRuler, LdPlus, LdRoute};
 use futures::StreamExt;
 use itertools::Itertools;
 use mlc_communication::services::project::{ProjectService, ProjectServiceIdent};
@@ -29,7 +30,7 @@ pub fn Configure() -> Element {
             Panel { column: "1 / 4", row: "1 / 9", title: "Fixture Catalog", FixtureCatalog {prj_service} }
             Panel { column: "1 / 13", row: "9 / 13", FaderPanel {prj: prj_service} }
             Panel { column: "10 / 13", row: "1 / 9", title: "Settings", Settings {prj: prj_service} }
-            Panel { column: "4 / 10", row: "1 / 9", title: "Universe Patcher" }
+            Panel { column: "4 / 10", row: "1 / 9", title: "Universe Patcher", UniversePatcher {prj: prj_service} }
         }
 
         Modal {
@@ -384,9 +385,15 @@ pub const UNIVERSE_LIST_CHANGED: SignalNotify = SignalNotify::create();
 
 #[component]
 fn FaderPanel(prj: SClient<ProjectServiceIdent>) -> Element {
-    let ul = use_resource(move || async move { prj.read().universe_list().await }).rtc_suspend()?;
+    let mut ul_control = use_resource(move || async move { prj.read().universe_list().await });
+    let ul = ul_control.rtc_suspend()?;
 
     let tabs = use_signal(move || MappedVecTabs::new(ul, 1));
+
+    use_effect(move || {
+        UNIVERSE_LIST_CHANGED.read();
+        ul_control.restart();
+    });
 
     let mut data = use_signal(|| [0_u8; UNIVERSE_SIZE]);
 
@@ -589,6 +596,47 @@ fn Settings(prj: SClient<ProjectServiceIdent>) -> Element {
                     //     ToastInfo::error("Failed to save endpoint mappings!", e.to_string()).post();
                     // }
                 }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn UniversePatcher(prj: SClient<ProjectServiceIdent>) -> Element {
+    let mut ul_control = use_resource(move || async move { prj.read().universe_list().await });
+    let ul = ul_control.rtc_suspend()?;
+
+    use_effect(move || {
+        UNIVERSE_LIST_CHANGED.read();
+        ul_control.restart();
+    });
+
+    let tabs = use_signal(move || MappedVecTabs::new(ul, 1));
+    rsx! {
+        div {
+            class: "universePatcher",
+            Tabs {
+                controller: tabs,
+                orientation: Orientation::Horizontal,
+                class: "tabs",
+                extra: move |_| {
+                    rsx!{
+                        IconButton {
+                            icon: LdPlus,
+                            class: "add",
+                            onclick: move |_| async move {
+                                info!("Add a new universe");
+                                let r = prj.read().universe_create().await;
+                                if let Err(r) = r {
+                                    error!("Failed to create a new universe: {}", r);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            div {
+                class: "universe",
             }
         }
     }

@@ -158,6 +158,7 @@ pub mod project {
             ),
             ProjectServiceError,
         >;
+        async fn universe_create(&self) -> Result<UniverseId, ProjectServiceError>;
         async fn get_settings(&self) -> Result<ProjectSettings, ProjectServiceError>;
         async fn update_settings(
             &self,
